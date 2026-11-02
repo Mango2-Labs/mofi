@@ -1,0 +1,3 @@
+[install]
+# Kamino's SDK loads Orca packages it doesn't declare, so dependencies are installed flat, not isolated.
+linker = "hoisted"
