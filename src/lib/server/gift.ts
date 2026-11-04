@@ -100,6 +100,49 @@ export async function giftReady(gift: string, mint: string) {
   return info?.owner === gift && info.closeAuthority === payer.address;
 }
 
+type ParsedIx = { parsed?: { type?: string; info?: { account?: string; authorityType?: string; newAuthority?: string } } };
+
+// Empty token accounts the fee wallet is the closer of: gift accounts prepared but never bought into, or emptied by a
+// link holder outside Mofi. Closing them returns their rent to the fee wallet. They're found from the fee wallet's
+// recent prepare transactions (the RPC blocks a search across all token accounts), a few at a time so one
+// transaction always fits.
+export async function sweepGiftAccounts({ send = false } = {}) {
+  const payer = await feeSigner();
+  const sigs = await rpc<{ signature: string; err: unknown }[]>("getSignaturesForAddress", [payer.address, { limit: 200 }]);
+  const txs = await Promise.all(
+    sigs.filter((s) => !s.err).map((s) => rpc<{ transaction: { message: { instructions: ParsedIx[] } } } | null>("getTransaction", [s.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null)),
+  );
+  const prepared = [
+    ...new Set(
+      txs.flatMap((tx) => tx?.transaction.message.instructions ?? []).flatMap(({ parsed }) =>
+        parsed?.type === "setAuthority" && parsed.info?.authorityType === "closeAccount" && parsed.info.newAuthority === payer.address && parsed.info.account ? [parsed.info.account] : [],
+      ),
+    ),
+  ].slice(0, 100);
+  if (!prepared.length) return { closed: 0 };
+  const { value } = await rpc<{ value: ({ owner: string; data: Holding["account"]["data"] } | null)[] }>("getMultipleAccounts", [prepared, { encoding: "jsonParsed" }]);
+  const found = prepared
+    .map((pubkey, i) => ({ pubkey, programId: value[i]?.owner ?? "", account: value[i] && { data: value[i]!.data } }))
+    .filter((a): a is { pubkey: string; programId: string; account: Holding["account"] } => {
+      const info = a.account?.data.parsed?.info;
+      return !!info && info.tokenAmount.amount === "0" && info.closeAuthority === payer.address;
+    })
+    .slice(0, 8);
+  if (!found.length) return { closed: 0 };
+  const instructions: Instruction[] = [getSetComputeUnitLimitInstruction({ units: 30_000 * found.length + 10_000 }), getSetComputeUnitPriceInstruction({ microLamports: 100_000 })];
+  for (const a of found) {
+    const program = programOf(a.programId);
+    const { mint, extensions } = a.account.data.parsed.info;
+    if (extensions?.some((e) => e.extension === "transferFeeAmount")) {
+      instructions.push(getHarvestWithheldTokensToMintInstruction({ mint: address(mint), sources: [address(a.pubkey)] }, program));
+    }
+    instructions.push(getCloseAccountInstruction({ account: address(a.pubkey), destination: payer.address, owner: payer }, program));
+  }
+  const transaction = await finish(instructions, payer, "Couldn't sweep gift accounts.");
+  if (!send) return { closed: found.length, sent: false };
+  return { closed: found.length, signature: await rpc<string>("sendTransaction", [transaction, { encoding: "base64" }]) };
+}
+
 // What's still in a gift wallet, from raw token balances (never prices, which can be briefly missing).
 export async function giftHoldings(gift: string) {
   const sets = await Promise.all(

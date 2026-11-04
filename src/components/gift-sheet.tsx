@@ -42,7 +42,7 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
         throw new Error("This browser couldn't save the gift link, so nothing was sent.");
       }
       // First the gift wallet's account opens, with Mofi as its only closer; the gift key signs that here.
-      const prep = await postJson("/api/gift/prepare", { owner: address, gift: gift.address, symbol: asset.symbol });
+      const prep = await postJson("/api/gift/prepare", { owner: address, gift: gift.address, symbol: asset.symbol, amount: dollars.toFixed(2) });
       const prepared = await prep.json();
       if (!prep.ok) throw new Error(prepared.error);
       const opened = await postJson("/api/send", { transaction: await signWithGift(gift.keyPair, prepared.transaction) });
