@@ -185,6 +185,11 @@ function Withdraw() {
               </dl>
             </Card>
           ))}
+          {dollars > 0 && dollars < 1 && (
+            <p className="px-1 text-sm text-loss">
+              The smallest withdrawal is $1, with fees on top{max < 1 ? `. You need a little over ${usd(1 + CASH_OUT_NETWORK_FEE)} in cash` : ""}.
+            </p>
+          )}
           {tooMuch && <p className="px-1 text-sm text-loss">That&apos;s more than your cash once fees are added. Tap Max for the most you can send.</p>}
           {error && <p className="px-1 text-sm text-loss">{error}</p>}
 

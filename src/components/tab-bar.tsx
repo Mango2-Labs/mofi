@@ -1,5 +1,6 @@
 "use client";
 
+import { usePrivy } from "@privy-io/react-auth";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/phone";
@@ -11,10 +12,11 @@ const TABS: [string, string, IconName][] = [
   ["/app/account", "Account", "account"],
 ];
 
-// The floating tab bar, shown only on the top-level screens.
+// The floating tab bar, shown only on the top-level screens and once the user is signed in.
 export function TabBar() {
   const path = usePathname();
-  if (!TABS.some(([href]) => href === path)) return null;
+  const { ready, authenticated } = usePrivy();
+  if (!ready || !authenticated || !TABS.some(([href]) => href === path)) return null;
   return (
     <nav aria-label="Main" className="fixed inset-x-4 bottom-4 z-20 mx-auto grid max-w-[408px] grid-cols-4 gap-1 rounded-full bg-card p-1.5 shadow-[0_12px_30px_rgba(10,10,11,0.1)]">
       {TABS.map(([href, label, icon]) => (

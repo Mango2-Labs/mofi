@@ -6,9 +6,9 @@ const fail = (message: string, status = 400) => Response.json({ error: message }
 
 // Deposit: the user's permanent deposit address on the chosen chain.
 export async function POST(req: Request) {
-  const denied = await guard(req, { counted: true });
-  if (denied) return denied;
   const body = await req.json().catch(() => null);
+  const denied = await guard(req, { counted: true, wallet: String(body?.recipient ?? "") });
+  if (denied) return denied;
   const chain = String(body?.chain ?? "");
   const recipient = String(body?.recipient ?? "");
   if (!DEPOSIT_CHAINS.has(chain) || chain === "sol") return fail("Pick the chain you're sending from.");

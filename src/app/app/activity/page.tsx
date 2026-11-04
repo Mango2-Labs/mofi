@@ -26,14 +26,14 @@ const day = (t: number) => {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 };
 
-// Money in is green, money out is dark, Earn is green, loans are neutral. Buys and sells use the asset's logo.
-const BADGE: Record<Exclude<Kind, "buy" | "sell" | "receive">, { icon: IconName; className: string; turn?: string }> = {
+// Money in is green, money out is dark, Earn is green, loans are neutral. Buys, sells and gifts use the asset's logo.
+const BADGE: Record<Exclude<Kind, "buy" | "sell" | "receive" | "gift">, { icon: IconName; className: string; turn?: string }> = {
   deposit: { icon: "rise", className: "bg-gain-soft text-gain", turn: "rotate-180" },
   withdraw: { icon: "rise", className: "bg-ink text-on-ink" },
   earn: { icon: "rise", className: "bg-gain text-white" },
   loan: { icon: "bank", className: "bg-surface-app text-ink" },
 };
-const LABEL: Record<Kind, string> = { deposit: "Deposit", withdraw: "Withdrawal", buy: "Buy", sell: "Sell", receive: "Received", earn: "Earn", loan: "Loan" };
+const LABEL: Record<Kind, string> = { deposit: "Deposit", withdraw: "Withdrawal", buy: "Buy", sell: "Sell", receive: "Received", gift: "Gift", earn: "Earn", loan: "Loan" };
 
 // Recent transactions, newest first and grouped by day, each linked to Solscan.
 function Activity() {
@@ -61,7 +61,7 @@ function Activity() {
             <h2 className="px-1 pt-2 text-[13px] font-semibold text-ink-muted">{label}</h2>
             <Card className="px-3.5 py-0.5">
               {items.map((a) => {
-                const badge = a.kind === "buy" || a.kind === "sell" || a.kind === "receive" ? null : BADGE[a.kind];
+                const badge = a.kind === "buy" || a.kind === "sell" || a.kind === "receive" || a.kind === "gift" ? null : BADGE[a.kind];
                 return (
                   <a key={a.signature} href={`https://solscan.io/tx/${a.signature}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 border-b border-divider py-3 last:border-0">
                     {badge ? (

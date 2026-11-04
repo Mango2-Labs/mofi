@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { AssetIcon, Card, Change, Icon, Money } from "@/components/phone";
 import { SignedIn, useMofiWallet } from "@/components/signed-in";
+import { GiftSheet } from "@/components/gift-sheet";
 import { TradeSheet } from "@/components/trade-sheet";
-import { KINDS, units, type AssetInfo } from "@/lib/assets";
+import { GIFTABLE, KINDS, units, type AssetInfo } from "@/lib/assets";
 import { usd } from "@/lib/format";
 import { usePortfolio, usePrices } from "@/lib/use-portfolio";
 
@@ -25,6 +27,9 @@ function Asset({ asset }: { asset: AssetInfo }) {
   const { portfolio } = usePortfolio(address);
   const price = usePrices()?.[asset.mint];
   const [side, setSide] = useState<"buy" | "sell" | null>(null);
+  // Arriving from Account's "Send a gift" (?gift=1) opens the Gift sheet straight away.
+  const giftable = GIFTABLE.has(asset.symbol);
+  const [gifting, setGifting] = useState(useSearchParams().get("gift") === "1" && giftable);
   const holding = portfolio?.holdings.find((h) => h.mint === asset.mint);
 
   return (
@@ -67,9 +72,11 @@ function Asset({ asset }: { asset: AssetInfo }) {
       <div className="fixed inset-x-0 bottom-0 z-10 mx-auto flex max-w-[440px] gap-2 bg-surface-app px-4 pt-3 pb-6">
         <button type="button" onClick={() => setSide("buy")} className="flex-1 cursor-pointer rounded-full bg-ink py-3.5 text-base font-semibold text-on-ink">Buy</button>
         {holding && <button type="button" onClick={() => setSide("sell")} className="w-24 cursor-pointer rounded-full bg-card py-3.5 text-base font-semibold">Sell</button>}
+        {giftable && <button type="button" onClick={() => setGifting(true)} className="flex w-24 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-card py-3.5 text-base font-semibold"><Icon name="gift" size={17} stroke={2} />Gift</button>}
       </div>
 
       {side && <TradeSheet asset={asset} side={side} price={price?.usdPrice} portfolio={portfolio} onClose={() => setSide(null)} />}
+      {gifting && <GiftSheet asset={asset} price={price?.usdPrice} cash={portfolio?.cash ?? 0} onClose={() => setGifting(false)} />}
     </>
   );
 }

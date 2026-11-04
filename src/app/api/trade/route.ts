@@ -25,9 +25,9 @@ async function sellAmount(owner: string, mint: string, dollars: number) {
 }
 
 export async function POST(req: Request) {
-  const denied = await guard(req, { counted: true });
-  if (denied) return denied;
   const body = await req.json().catch(() => null);
+  const denied = await guard(req, { counted: true, wallet: String(body?.taker ?? "") });
+  if (denied) return denied;
   const asset = ASSETS.find((a) => a.symbol === body?.symbol);
   const taker = String(body?.taker ?? "");
   const dollars = Number(body?.amount);

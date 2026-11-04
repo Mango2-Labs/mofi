@@ -31,7 +31,8 @@ export type Order = {
   errorCode?: number;
 };
 
-export function order(params: { inputMint: string; outputMint: string; amount: string; taker: string; payer?: string }): Promise<Order> {
+// receiver sends what's bought to another wallet (a gift); Jupiter opens its token account, paid for by payer.
+export function order(params: { inputMint: string; outputMint: string; amount: string; taker: string; payer?: string; receiver?: string }): Promise<Order> {
   return swapApi(`order?${new URLSearchParams(params)}`);
 }
 

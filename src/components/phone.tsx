@@ -25,6 +25,7 @@ const ICONS = {
   explore: <><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></>,
   wallet: <><path d="M3 7h18v12H3z" /><path d="M16 13h2" /><path d="M3 7l3-3h12l3 3" /></>,
   activity: <path d="M3 12h4l3-7 4 14 3-7h4" />,
+  gift: <><path d="M3.5 8h17v4h-17z" /><path d="M5 12v8.5h14V12" /><path d="M12 8v12.5" /><path d="M12 8C10.6 5.2 7.2 5 7.2 6.9 7.2 8 9.5 8 12 8zm0 0c1.4-2.8 4.8-3 4.8-1.1C16.8 8 14.5 8 12 8z" /></>,
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -15,8 +15,9 @@ import { usePrices } from "@/lib/use-portfolio";
 
 export type Picked = { chain: string; coin: string; address: string; memo?: string };
 
-const COIN_NAMES: Record<string, string> = { USDT: "Tether", USDC: "USD Coin", BTC: "Bitcoin", ETH: "Ether", SOL: "Solana", BNB: "BNB" };
-const TOP = ["USDT", "USDC", "BTC", "ETH"];
+const COIN_NAMES: Record<string, string> = { USDT: "Tether", USDC: "USD Coin", USDG: "Global Dollar", BTC: "Bitcoin", ETH: "Ether", SOL: "Solana", BNB: "BNB" };
+const TOP = ["USDT", "USDC", "USDG", "BTC", "ETH"];
+const SOLANA_ONLY: AuroraAsset[] = [{ assetId: SOL_USDC_ASSET, chain: "sol", symbol: "USDC", decimals: 6, native: false }];
 // USDT0 is Tether's own USDT on Arbitrum and a few other chains, so it lists as USDT.
 const coinOf = (symbol: string) => (symbol === "USDT0" ? "USDT" : symbol);
 const topRank = (c: string) => (TOP.includes(c) ? TOP.indexOf(c) : 99);
@@ -36,7 +37,10 @@ function Heading({ title, sub }: { title: string; sub: string }) {
 export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { need?: number; onBack?: () => void; onPicked?: (p: Picked) => void; onUnpick?: () => void; children?: ReactNode }) {
   const { address } = useMofiWallet();
   const prices = usePrices();
-  const assets = usePoll<AuroraAsset[]>("/api/assets", 600_000).data?.filter((a) => DEPOSIT_CHAINS.has(a.chain) && (a.chain !== "sol" || a.assetId === SOL_USDC_ASSET));
+  const { data: list0, error: listError } = usePoll<AuroraAsset[]>("/api/assets", 600_000);
+  // While Aurora is down, USDC on Solana still works: it goes straight to the user's own address.
+  const aurora = !(listError && !list0);
+  const assets = (list0 ?? (aurora ? undefined : SOLANA_ONLY))?.filter((a) => DEPOSIT_CHAINS.has(a.chain) && (a.chain !== "sol" || a.assetId === SOL_USDC_ASSET));
   const [coin, setCoin] = useState<string | null>(null);
   const [more, setMore] = useState(false);
   const [picked, setPicked] = useState<Picked | null>(null);
@@ -93,13 +97,14 @@ export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { ne
       {!coin && (
         <>
           <div className="flex justify-center pt-1">
-            {["USDT", "USDC", "BTC", "ETH", "SOL"].map((c, i) => (
+            {[["USDT", "usdt"], ["USDC", "usdc"], ["BTC", "bitcoin"], ["ETH", "ethereum"], ["SOL", "solana"]].map(([c, file], i) => (
               <span key={c} className={`rounded-full border-[3px] border-surface-app ${i ? "-ml-3.5" : ""}`}>
-                <Logo src={logoOf(c) ?? CHAINS[c.toLowerCase()]?.logo} label={c} size={i === 2 ? 64 : i % 2 ? 54 : 44} />
+                <Logo src={`/logos/${file}.png`} label={c} size={i === 2 ? 64 : i % 2 ? 54 : 44} />
               </span>
             ))}
           </div>
           <Heading title={need ? `Deposit ${usd(send)}` : "Deposit"} sub="Send from any wallet or exchange." />
+          {!aurora && <p className="rounded-[18px] bg-card px-4 py-3 text-sm text-ink-muted">Aurora isn&apos;t answering right now, so only USDC on Solana works. Other chains come back when it does.</p>}
           <Card className="px-3 py-0.5">
             {shown.map((c) => (
               <button key={c} type="button" onClick={() => setCoin(c)} className="flex cursor-pointer items-center gap-3 border-b border-divider py-3 text-left last:border-0">

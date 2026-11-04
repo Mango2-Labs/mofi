@@ -81,10 +81,16 @@ export async function swapStatus(depositAddress: string) {
 type Token = { assetId: string; blockchain: string; symbol: string; decimals: number; contractAddress?: string };
 let cached: { at: number; list: AuroraAsset[] } | undefined;
 
-// Aurora's token list rarely changes, so each server instance keeps it for ten minutes.
+// Aurora's token list rarely changes, so each server instance keeps it for ten minutes, and keeps using the last
+// list it got while Aurora is down.
 export async function assets(): Promise<AuroraAsset[]> {
   if (cached && Date.now() - cached.at < 600_000) return cached.list;
-  const { tokens }: { tokens: Token[] } = await call("tokens/{key}");
+  const reply = await call("tokens/{key}").catch(() => null);
+  if (!reply) {
+    if (cached) return cached.list;
+    throw new AuroraError("Aurora isn't answering right now. Try again in a few minutes.");
+  }
+  const { tokens }: { tokens: Token[] } = reply;
   const list = tokens
     .filter((t) => !t.symbol.includes("DEPRECATED"))
     .map((t) => ({ assetId: t.assetId, chain: t.blockchain, symbol: t.symbol, decimals: t.decimals, native: !t.contractAddress }));
