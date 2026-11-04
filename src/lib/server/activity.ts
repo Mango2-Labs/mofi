@@ -25,7 +25,8 @@ const TRACKED = new Set([USDC_MINT, EARN_SHARES_MINT, ...ASSETS.map((a) => a.min
 export async function activity(owner: string): Promise<Activity[]> {
   const accountSets = await Promise.all(TOKEN_PROGRAMS.map((programId) => rpc<TokenAccounts>("getTokenAccountsByOwner", [owner, { programId }, { encoding: "jsonParsed" }])));
   const addresses = [owner, ...accountSets.flatMap((s) => s.value).filter((a) => TRACKED.has(a.account.data.parsed.info.mint)).map((a) => a.pubkey)];
-  const lists = await Promise.all(addresses.map((a) => rpc<Sig[]>("getSignaturesForAddress", [a, { limit: 25 }])));
+  // One account's lookup failing (a busy RPC, say) only leaves its transactions out.
+  const lists = await Promise.all(addresses.map((a) => rpc<Sig[]>("getSignaturesForAddress", [a, { limit: 25 }]).catch(() => [] as Sig[])));
   const sigs = [...new Map(lists.flat().map((s) => [s.signature, s])).values()].sort((x, y) => y.blockTime - x.blockTime).slice(0, 25);
   const txs = await Promise.all(
     sigs.filter((s) => !s.err).map((s) => rpc<Tx | null>("getTransaction", [s.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).then((tx) => ({ s, tx }), () => ({ s, tx: null }))),
