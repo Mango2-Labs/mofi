@@ -1,7 +1,6 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
-import { getBase64Decoder, getBase64Encoder, getTransactionDecoder, getTransactionEncoder, partiallySignTransaction } from "@solana/kit";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Wordmark } from "@/components/logo";
@@ -9,7 +8,7 @@ import { AssetRow, Card, Icon } from "@/components/phone";
 import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
 import { usd } from "@/lib/format";
-import { openGift } from "@/lib/gift-links";
+import { openGift, signWithGift } from "@/lib/gift-links";
 import { usePoll } from "@/lib/use-poll";
 import type { Portfolio } from "@/lib/use-portfolio";
 
@@ -48,9 +47,7 @@ export default function GiftPage() {
       const res = await postJson("/api/gift/claim", { gift: gift.address, to: address });
       const data = await res.json();
       if (!res.ok) return setError(data.error);
-      const tx = getTransactionDecoder().decode(getBase64Encoder().encode(data.transaction));
-      const signed = getBase64Decoder().decode(getTransactionEncoder().encode(await partiallySignTransaction([gift.keyPair], tx)));
-      const sent = await postJson("/api/send", { transaction: signed });
+      const sent = await postJson("/api/send", { transaction: await signWithGift(gift.keyPair, data.transaction) });
       if (sent.ok) {
         // The link's key leaves the address bar and history once it's been used.
         history.replaceState(null, "", location.pathname);

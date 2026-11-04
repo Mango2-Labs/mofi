@@ -1,13 +1,29 @@
 "use client";
 
-import { createKeyPairFromPrivateKeyBytes, getAddressFromPublicKey, getBase58Decoder, getBase58Encoder } from "@solana/kit";
+import {
+  createKeyPairFromPrivateKeyBytes,
+  getAddressFromPublicKey,
+  getBase58Decoder,
+  getBase58Encoder,
+  getBase64Decoder,
+  getBase64Encoder,
+  getTransactionDecoder,
+  getTransactionEncoder,
+  partiallySignTransaction,
+} from "@solana/kit";
 
 // A gift wallet is a fresh key whose 32 secret bytes go in the link after #, a part browsers never send to a server.
 // Whoever has the link can claim what's in it.
 export async function newGift() {
   const seed = crypto.getRandomValues(new Uint8Array(32));
   const keyPair = await createKeyPairFromPrivateKeyBytes(seed);
-  return { address: await getAddressFromPublicKey(keyPair.publicKey), link: `${location.origin}/app/gift#${getBase58Decoder().decode(seed)}` };
+  return { keyPair, address: await getAddressFromPublicKey(keyPair.publicKey), link: `${location.origin}/app/gift#${getBase58Decoder().decode(seed)}` };
+}
+
+// Adds the gift key's signature to a transaction the server built and the fee wallet already signed.
+export async function signWithGift(keyPair: CryptoKeyPair, base64: string) {
+  const tx = getTransactionDecoder().decode(getBase64Encoder().encode(base64));
+  return getBase64Decoder().decode(getTransactionEncoder().encode(await partiallySignTransaction([keyPair], tx)));
 }
 
 export async function openGift(hash: string) {

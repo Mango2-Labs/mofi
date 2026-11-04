@@ -11,7 +11,7 @@ import { postJson } from "@/lib/api";
 import { units, type AssetInfo } from "@/lib/assets";
 import { fromBase64, toBase64 } from "@/lib/base64";
 import { splitCents, usd } from "@/lib/format";
-import { newGift, saveGift } from "@/lib/gift-links";
+import { newGift, saveGift, signWithGift } from "@/lib/gift-links";
 
 const MIN = 1;
 
@@ -41,6 +41,12 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
       if (!address || !saveGift(address, { link: gift.link, symbol: asset.symbol, name: asset.name, amount: dollars, at: Date.now() })) {
         throw new Error("This browser couldn't save the gift link, so nothing was sent.");
       }
+      // First the gift wallet's account opens, with Mofi as its only closer; the gift key signs that here.
+      const prep = await postJson("/api/gift/prepare", { owner: address, gift: gift.address, symbol: asset.symbol });
+      const prepared = await prep.json();
+      if (!prep.ok) throw new Error(prepared.error);
+      const opened = await postJson("/api/send", { transaction: await signWithGift(gift.keyPair, prepared.transaction) });
+      if (!opened.ok) throw new Error((await opened.json()).error);
       const res = await postJson("/api/gift", { owner: address, gift: gift.address, symbol: asset.symbol, amount: dollars.toFixed(2) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
