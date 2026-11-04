@@ -40,6 +40,9 @@ export const ASSETS: AssetInfo[] = [
 
 export const assetByMint = new Map(ASSETS.map((a) => [a.mint, a]));
 
+// What can be gifted: everything that's a token. SOL would land as plain SOL, which a gift claim doesn't move.
+export const GIFTABLE = new Set(ASSETS.filter((a) => a.symbol !== "SOL").map((a) => a.symbol));
+
 // "0.365 shares" for stocks and funds, "0.00065 BTC" for crypto.
 export const units = (a: AssetInfo, n: number) =>
   `${n.toLocaleString("en-US", { maximumSignificantDigits: 4 })} ${a.kind === "crypto" ? a.symbol : "shares"}`;

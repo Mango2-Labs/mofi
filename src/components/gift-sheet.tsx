@@ -32,11 +32,15 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
   async function send() {
     setBusy(true);
     setError(null);
-    // The link is saved before anything moves and is never deleted, so a gift can't be lost even if this tab closes
-    // mid-way or the reply fails after the buy landed. An empty one is simply hidden in Account.
-    const gift = await newGift();
-    saveGift({ link: gift.link, symbol: asset.symbol, name: asset.name, amount: dollars, at: Date.now() });
     try {
+      const gift = await newGift().catch(() => {
+        throw new Error("This browser can't make gift links. Try the latest Chrome or Safari.");
+      });
+      // The link is saved (and read back) before anything moves, and never deleted, so a gift can't be lost even if
+      // this tab closes mid-way or the reply fails after the buy landed. An empty one is simply hidden in Account.
+      if (!address || !saveGift(address, { link: gift.link, symbol: asset.symbol, name: asset.name, amount: dollars, at: Date.now() })) {
+        throw new Error("This browser couldn't save the gift link, so nothing was sent.");
+      }
       const res = await postJson("/api/gift", { owner: address, gift: gift.address, symbol: asset.symbol, amount: dollars.toFixed(2) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

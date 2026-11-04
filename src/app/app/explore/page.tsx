@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { AssetRow, Card, Icon } from "@/components/phone";
-import { ASSETS, KINDS, type AssetKind } from "@/lib/assets";
+import { ASSETS, GIFTABLE, KINDS, type AssetKind } from "@/lib/assets";
 import { usePrices } from "@/lib/use-portfolio";
 
 export default function ExplorePage() {
@@ -15,7 +15,7 @@ export default function ExplorePage() {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const groups = KINDS.filter((k) => kind === "all" || k.kind === kind)
-    .map((k) => ({ ...k, items: ASSETS.filter((a) => a.kind === k.kind && (!q || `${a.name} ${a.symbol}`.toLowerCase().includes(q))) }))
+    .map((k) => ({ ...k, items: ASSETS.filter((a) => a.kind === k.kind && (!gift || GIFTABLE.has(a.symbol)) && (!q || `${a.name} ${a.symbol}`.toLowerCase().includes(q))) }))
     .filter((g) => g.items.length);
 
   return (

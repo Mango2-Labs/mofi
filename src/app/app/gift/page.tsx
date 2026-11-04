@@ -51,7 +51,11 @@ export default function GiftPage() {
       const tx = getTransactionDecoder().decode(getBase64Encoder().encode(data.transaction));
       const signed = getBase64Decoder().decode(getTransactionEncoder().encode(await partiallySignTransaction([gift.keyPair], tx)));
       const sent = await postJson("/api/send", { transaction: signed });
-      if (sent.ok) setClaimed(true);
+      if (sent.ok) {
+        // The link's key leaves the address bar and history once it's been used.
+        history.replaceState(null, "", location.pathname);
+        setClaimed(true);
+      }
       else setError((await sent.json()).error);
     } catch (e) {
       setError(`This didn't go through${e instanceof Error && e.message ? ` (${e.message})` : ""}. Try again.`);

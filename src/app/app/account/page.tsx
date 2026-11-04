@@ -24,23 +24,28 @@ function Account() {
   const { portfolio } = usePortfolio(address);
   const apy = usePoll<{ apy: number }>("/api/earn", 300_000).data?.apy;
   const [copied, setCopied] = useState(false);
-  // Signed-in content only renders in the browser, so the saved links can be read straight away. Each is then checked
-  // on-chain from raw token balances: a claimed one (empty, and older than two minutes so it isn't still landing) is
-  // hidden. Links are never deleted, since a link is the only key to its gift.
-  const [gifts, setGifts] = useState<(SavedGift & { checked?: boolean })[]>(savedGifts);
+  // This account's saved links, each checked on-chain from raw token balances: a claimed one (empty, and older than
+  // two minutes so it isn't still landing) is hidden. Links are never deleted, since a link is the only key to its gift.
+  // A link whose check fails stays listed.
+  const [gifts, setGifts] = useState<(SavedGift & { checked?: boolean })[]>([]);
   const [copiedGift, setCopiedGift] = useState<string | null>(null);
   useEffect(() => {
+    if (!address) return;
     let live = true;
     Promise.all(
-      savedGifts().map(async (g) => {
-        const { address: wallet } = await openGift(new URL(g.link).hash);
-        const res = await fetch(`/api/gift/status?address=${wallet}`);
-        const claimed = res.ok ? ((await res.json()) as { claimed: boolean }).claimed : null;
-        return { ...g, checked: claimed !== null, claimed: claimed === true && Date.now() - g.at > 120_000 };
+      savedGifts(address).map(async (g) => {
+        try {
+          const { address: wallet } = await openGift(new URL(g.link).hash);
+          const res = await fetch(`/api/gift/status?address=${wallet}`);
+          const claimed = res.ok ? ((await res.json()) as { claimed: boolean }).claimed : null;
+          return { ...g, checked: claimed !== null, claimed: claimed === true && Date.now() - g.at > 120_000 };
+        } catch {
+          return { ...g, checked: false, claimed: false };
+        }
       }),
-    ).then((list) => live && setGifts(list.filter((g) => !g.claimed)), () => {});
+    ).then((list) => live && setGifts(list.filter((g) => !g.claimed)));
     return () => { live = false; };
-  }, []);
+  }, [address]);
   return (
     <>
       <h1 className="text-center text-base font-semibold">Account</h1>
@@ -82,7 +87,7 @@ function Account() {
               {asset && <AssetIcon asset={{ ticker: asset.symbol, logo: asset.logo }} size={36} />}
               <a href={g.link} className="flex flex-1 flex-col leading-tight">
                 <span className="text-[15px] font-semibold">{usd(g.amount)} of {g.name}</span>
-                <span className="text-xs text-ink-muted">{g.checked ? "Not claimed yet" : "Checking…"} · {new Date(g.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                <span className="text-xs text-ink-muted">{g.checked ? "Not claimed yet" : "Couldn't check right now"} · {new Date(g.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
               </a>
               <button type="button" onClick={() => navigator.clipboard?.writeText(g.link).then(() => setCopiedGift(g.link), () => {})} className="cursor-pointer rounded-full bg-surface-app px-3.5 py-1.5 text-sm font-semibold">
                 {copiedGift === g.link ? "Copied" : "Copy link"}

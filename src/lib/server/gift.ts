@@ -3,6 +3,7 @@ import {
   findAssociatedTokenPda,
   getCloseAccountInstruction,
   getCreateAssociatedTokenIdempotentInstruction,
+  getHarvestWithheldTokensToMintInstruction,
   getTransferCheckedInstruction,
 } from "@solana-program/token-2022";
 import {
@@ -27,7 +28,14 @@ export class GiftError extends Error {}
 
 const GIFTABLE = new Set([USDC_MINT, ...ASSETS.map((a) => a.mint)]);
 
-type Holding = { pubkey: string; account: { data: { parsed: { info: { mint: string; tokenAmount: { amount: string; decimals: number } } } } } };
+type Holding = {
+  pubkey: string;
+  account: { data: { parsed: { info: { mint: string; tokenAmount: { amount: string; decimals: number }; extensions?: { extension: string }[] } } } };
+};
+
+// A claim fits about five tokens in one transaction; anything beyond (dust someone sent to the gift wallet, say) is
+// left for the next claim, so it can never block the gift.
+const PER_CLAIM = 5;
 
 // What's still in a gift wallet, from raw token balances (never prices, which can be briefly missing).
 export async function giftHoldings(gift: string) {
@@ -41,20 +49,26 @@ export async function giftHoldings(gift: string) {
 // returning their rent to the fee wallet that opened them. The fee wallet pays and signs; the link's key signs after,
 // in the claimer's browser, so the server never sees it.
 export async function buildClaim(gift: string, to: string) {
-  const [payer, held] = await Promise.all([feeSigner(), giftHoldings(gift)]);
-  if (!held.length) throw new GiftError("This gift has already been claimed.");
+  const [payer, all] = await Promise.all([feeSigner(), giftHoldings(gift)]);
+  if (!all.length) throw new GiftError("This gift has already been claimed.");
+  const held = all.slice(0, PER_CLAIM);
 
   const owner = createNoopSigner(address(gift));
   const instructions: Instruction[] = [getSetComputeUnitLimitInstruction({ units: 60_000 * held.length + 20_000 }), getSetComputeUnitPriceInstruction({ microLamports: 100_000 })];
   for (const h of held) {
-    const { mint, tokenAmount } = h.account.data.parsed.info;
+    const { mint, tokenAmount, extensions } = h.account.data.parsed.info;
     const program = { programAddress: address(h.programId) } as { programAddress: Address<never> };
     const [ata] = await findAssociatedTokenPda({ owner: address(to), mint: address(mint), tokenProgram: address(h.programId) });
     instructions.push(
       getCreateAssociatedTokenIdempotentInstruction({ payer, ata, owner: address(to), mint: address(mint), tokenProgram: address(h.programId) }),
       getTransferCheckedInstruction({ source: address(h.pubkey), mint: address(mint), destination: ata, authority: owner, amount: BigInt(tokenAmount.amount), decimals: tokenAmount.decimals }, program),
-      getCloseAccountInstruction({ account: address(h.pubkey), destination: payer.address, owner }, program),
     );
+    // Tokens with a transfer fee (OpenAI and Anthropic, for example) keep fees withheld in the account, and it can't
+    // close until they're swept to the mint.
+    if (extensions?.some((e) => e.extension === "transferFeeAmount")) {
+      instructions.push(getHarvestWithheldTokensToMintInstruction({ mint: address(mint), sources: [address(h.pubkey)] }, program));
+    }
+    instructions.push(getCloseAccountInstruction({ account: address(h.pubkey), destination: payer.address, owner }, program));
   }
 
   const { value: latest } = await rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>("getLatestBlockhash", [{ commitment: "confirmed" }]);
