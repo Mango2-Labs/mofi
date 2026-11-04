@@ -2,7 +2,7 @@ import { ASSETS, USDC_MINT, assetByMint } from "@/lib/assets";
 import { EARN_SHARES_MINT, earnMetrics } from "@/lib/server/earn";
 import { prices } from "@/lib/server/jupiter";
 
-const TOKEN_PROGRAMS = ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"];
+export const TOKEN_PROGRAMS = ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"];
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
