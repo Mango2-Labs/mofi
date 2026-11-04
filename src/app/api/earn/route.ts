@@ -16,9 +16,9 @@ export async function GET() {
 
 // A move into or out of Earn for the user to sign, already signed by the fee wallet.
 export async function POST(req: Request) {
-  const denied = await guard(req, { counted: true });
-  if (denied) return denied;
   const body = await req.json().catch(() => null);
+  const denied = await guard(req, { counted: true, wallet: String(body?.owner ?? "") });
+  if (denied) return denied;
   const owner = String(body?.owner ?? "");
   const direction = body?.direction;
   const dollars = Math.floor(Number(body?.amount) * 1e6) / 1e6;

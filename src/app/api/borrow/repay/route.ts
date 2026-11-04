@@ -6,9 +6,9 @@ const fail = (message: string, status = 400) => Response.json({ error: message }
 
 // A repay-everything transaction for the user to sign: pays back the loan and unlocks the stock.
 export async function POST(req: Request) {
-  const denied = await guard(req, { counted: true });
-  if (denied) return denied;
   const body = await req.json().catch(() => null);
+  const denied = await guard(req, { counted: true, wallet: String(body?.owner ?? "") });
+  if (denied) return denied;
   const owner = String(body?.owner ?? "");
   if (!isSolanaAddress(owner)) return fail("Your Mofi wallet isn't ready yet.");
   try {

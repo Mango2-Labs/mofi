@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const compare = body?.compare === true;
   // Price checks make nothing, so they don't count toward the hourly cap.
-  const denied = await guard(req, { counted: !compare });
+  const denied = await guard(req, { counted: !compare, wallet: String(body?.owner ?? "") });
   if (denied) return denied;
   const owner = String(body?.owner ?? "");
   const recipient = String(body?.recipient ?? "").trim();
