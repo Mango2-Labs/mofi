@@ -1,17 +1,18 @@
 import { guard } from "@/lib/server/auth";
-import { AuroraError, assets, createQuote, withdrawAddress } from "@/lib/server/aurora";
+import { AuroraError, assets, createQuote } from "@/lib/server/aurora";
 import { feeWallet, payUsdc } from "@/lib/server/fee-payer";
-import { SetupError, setupCost } from "@/lib/server/withdraw-setup";
+import { kvReady } from "@/lib/server/kv";
+import { SetupError, knownAddress, permanentAddress, setupCost } from "@/lib/server/withdraw-setup";
 import { SOL_USDC_ASSET, chainName, isSolanaAddress, looksLikeAddress, toBaseUnits } from "@/lib/chains";
 import { usd } from "@/lib/format";
 
 const fail = (message: string, status = 400) => Response.json({ error: message }, { status });
 
 // A withdrawal is a USDC transfer to a Solana address of Aurora's that pays out on the chosen chain. A normal one goes
-// to the user's permanent address for that destination, so its USDC account is opened once. A private one takes a
-// fresh address from a confidential quote each time. The server builds the transfer itself, so the fee wallet never
-// signs for an address a client chose. Mofi charges nothing, except the exact cost of opening an account once a
-// user's free openings are used up (see withdraw-setup.ts).
+// to the user's permanent address for that destination, so its USDC account is opened once. A private one (or any,
+// while the shared store isn't set up) takes a fresh address from a quote each time. The server builds the transfer
+// itself, so the fee wallet never signs for an address a client chose. Mofi charges nothing, except the exact cost of
+// opening an account once a user's free openings are used up (see withdraw-setup.ts). Pricing never creates addresses.
 // `amount` is everything taken from the user's cash: that setup cost, if any, and Aurora gets the rest.
 // With `compare`, `amount` is what should arrive instead. It prices the withdrawal with and without Private (dry
 // quotes) and returns the total to take, fees on top, before the user taps Withdraw.
@@ -49,14 +50,15 @@ export async function POST(req: Request) {
         if (privately && e instanceof AuroraError && /liquidity/i.test(e.message)) throw new AuroraError(`${to.symbol} on ${chainName(to.chain)} can't be sent privately right now. Turn off Private to send it.`);
         throw e;
       });
-    const permanent = () => withdrawAddress(owner, to.chain, to.assetId, recipient);
+    const permanent = !privately && kvReady();
 
     if (compare) {
       const want = Number(amount) / 1e6;
       // Aurora's cost at this size is what goes in minus what comes out, so sending want + that cost arrives as about want.
       // The total is rounded up to a tenth of a cent, and exactly that is taken when the user withdraws.
       const price = async (privately: boolean) => {
-        const [q, setup] = await Promise.all([quote(BigInt(amount), privately, true), setupCost(owner, privately ? null : await permanent())]);
+        const known = !privately && kvReady() ? await knownAddress(owner, to.chain, to.assetId, recipient) : null;
+        const [q, setup] = await Promise.all([quote(BigInt(amount), privately, true), setupCost(owner, known)]);
         const cost = Math.max(0, want - q.amountOutUsd);
         return {
           total: Math.ceil((want + cost + setup) * 1000) / 1000,
@@ -71,13 +73,13 @@ export async function POST(req: Request) {
     }
 
     // The setup cost is worked out again here and must match what the user saw, so nobody pays a surprise.
-    const depositAddress = privately ? null : await permanent();
-    const setup = await setupCost(owner, depositAddress);
+    const depositAddress = permanent ? await permanentAddress(owner, to.chain, to.assetId, recipient) : null;
+    const setup = await setupCost(owner, depositAddress, { reserve: true });
     if (Math.abs(setup - Number(body?.setup ?? 0)) > 0.0005) return fail("The network setup cost changed. Check the new total and try again.", 409);
     const fee = BigInt(Math.round(setup * 1e6));
     const send = BigInt(amount) - fee;
-    if (privately) {
-      const q = await quote(send, true, false);
+    if (!depositAddress) {
+      const q = await quote(send, privately, false);
       const transaction = await payUsdc(owner, q.depositAddress, send, fee);
       return Response.json({ transaction, depositAddress: q.depositAddress, amountOut: q.amountOut, timeEstimate: q.timeEstimate });
     }

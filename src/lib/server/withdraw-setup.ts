@@ -1,12 +1,14 @@
-import { USDC_MINT } from "@/lib/assets";
+import { withdrawAddress } from "@/lib/server/aurora";
 import { feeWallet, usdcAccount } from "@/lib/server/fee-payer";
 import { prices } from "@/lib/server/jupiter";
+import { kvGet, kvIncr, kvReady, kvSet } from "@/lib/server/kv";
 import { rpc } from "@/lib/server/portfolio";
 
-// A withdrawal pays USDC into an Aurora address on Solana, and the first one to an address opens its USDC account,
-// whose rent never comes back to Mofi. Each user gets FREE_OPENINGS a day. Past that, or while the fee wallet is down to
-// its floor, the user pays the exact cost (rent plus the transaction fee) in USDC. Openings are counted from the user's
-// own Solana history, so nothing is stored and every server instance agrees.
+// A withdrawal pays USDC into an Aurora address on Solana, and the first one to an address opens its USDC account, whose
+// rent never comes back to Mofi. Normal withdrawals reuse one permanent address per user and destination, so that
+// happens once. Each user gets FREE_OPENINGS a day, reserved in the shared store when a withdrawal is built, so a burst
+// of requests can't all be free. Past that, while the fee wallet is down to its floor, or when the store isn't set up,
+// the user pays the exact cost (rent plus the transaction fee) in USDC.
 export const FREE_OPENINGS = 3;
 export const FEE_WALLET_FLOOR = 20_000_000; // lamports kept for network fees on trades and withdrawals (0.02 SOL)
 const TX_FEE = 16_000; // two signatures plus the priority fee, in lamports
@@ -14,42 +16,43 @@ const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export class SetupError extends Error {}
 
-type Balance = { accountIndex: number; mint: string; owner?: string };
-type Parsed = { transaction: { message: { accountKeys: { pubkey: string }[] } }; meta: { preTokenBalances: Balance[]; postTokenBalances: Balance[] } };
+const day = () => new Date().toISOString().slice(0, 10);
+// EVM addresses are case-insensitive; others (Tron, Bitcoin, Solana) aren't.
+const destination = (owner: string, chain: string, assetId: string, recipient: string) =>
+  `withdraw:${owner}:${chain}:${assetId}:${/^0x/i.test(recipient) ? recipient.toLowerCase() : recipient}`;
 
-// USDC accounts the fee wallet opened for someone else in the user's transactions over the last day: withdrawals to
-// new addresses. Kept for half a minute, since the Withdraw screen prices as people type.
-const counted = new Map<string, { at: number; count: number }>();
-async function openingsToday(owner: string, payer: string) {
-  const hit = counted.get(owner);
-  if (hit && Date.now() - hit.at < 30_000) return hit.count;
-  const since = Date.now() / 1000 - 86_400;
-  const sigs = await rpc<{ signature: string; blockTime: number | null; err: unknown }[]>("getSignaturesForAddress", [owner, { limit: 50 }]);
-  const txs = await Promise.all(
-    sigs
-      .filter((s) => !s.err && (s.blockTime ?? 0) > since)
-      .map((s) => rpc<Parsed | null>("getTransaction", [s.signature, { encoding: "jsonParsed", maxSupportedTransactionVersion: 0 }]).catch(() => null)),
-  );
-  const count = txs.filter(
-    (tx) =>
-      tx?.transaction.message.accountKeys[0]?.pubkey === payer &&
-      tx.meta.postTokenBalances.some((b) => b.mint === USDC_MINT && b.owner !== owner && !tx.meta.preTokenBalances.some((p) => p.accountIndex === b.accountIndex)),
-  ).length;
-  counted.set(owner, { at: Date.now(), count });
-  return count;
+// The user's permanent address for a destination, if they've withdrawn there before. Never creates one.
+export const knownAddress = (owner: string, chain: string, assetId: string, recipient: string) =>
+  kvGet(destination(owner, chain, assetId, recipient));
+
+// The permanent address for a destination, made (and remembered) on the first withdrawal there.
+export async function permanentAddress(owner: string, chain: string, assetId: string, recipient: string) {
+  const key = destination(owner, chain, assetId, recipient);
+  const known = await kvGet(key);
+  if (known) return known;
+  const made = await withdrawAddress(owner, chain, assetId, recipient);
+  await kvSet(key, made);
+  return made;
 }
 
-// What the user pays to open the USDC account at `depositAddress` (null for a fresh one, as private withdrawals use):
-// 0 when it's already open or still free for them, else the exact cost, rounded up to a tenth of a cent.
-export async function setupCost(owner: string, depositAddress: string | null) {
+async function exactCost() {
+  const [rent, sol] = await Promise.all([rpc<number>("getMinimumBalanceForRentExemption", [165]), prices([SOL_MINT]).then((p) => p[SOL_MINT]?.usdPrice)]);
+  if (!sol) throw new SetupError("Couldn't price the network setup right now. Try again.");
+  return Math.ceil(((rent + TX_FEE) / 1e9) * sol * 1000) / 1000;
+}
+
+// What the user pays to open the USDC account at `depositAddress` (null for one not open yet, as a new destination or a
+// private withdrawal has): 0 when it's open already or still free for them, else the exact cost, rounded up to a tenth
+// of a cent. With `reserve`, a free opening is taken from today's allowance; without, it's only priced.
+export async function setupCost(owner: string, depositAddress: string | null, { reserve = false } = {}) {
   if (depositAddress) {
     const { value } = await rpc<{ value: unknown }>("getAccountInfo", [await usdcAccount(depositAddress), { encoding: "base64" }]);
     if (value) return 0;
   }
-  const payer = (await feeWallet())!.address;
-  const [count, { value: balance }] = await Promise.all([openingsToday(owner, payer), rpc<{ value: number }>("getBalance", [payer])]);
-  if (count < FREE_OPENINGS && balance > FEE_WALLET_FLOOR) return 0;
-  const [rent, sol] = await Promise.all([rpc<number>("getMinimumBalanceForRentExemption", [165]), prices([SOL_MINT]).then((p) => p[SOL_MINT]?.usdPrice)]);
-  if (!sol) throw new SetupError("Couldn't price the network setup right now. Try again.");
-  return Math.ceil(((rent + TX_FEE) / 1e9) * sol * 1000) / 1000;
+  if (!kvReady()) return exactCost();
+  const { value: balance } = await rpc<{ value: number }>("getBalance", [(await feeWallet())!.address]);
+  if (balance <= FEE_WALLET_FLOOR) return exactCost();
+  const key = `openings:${owner}:${day()}`;
+  const used = reserve ? await kvIncr(key, 172_800) : Number((await kvGet(key)) ?? 0) + 1;
+  return used <= FREE_OPENINGS ? 0 : exactCost();
 }
