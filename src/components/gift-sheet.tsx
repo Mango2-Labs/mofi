@@ -3,14 +3,15 @@
 import { useSignTransaction } from "@privy-io/react-auth/solana";
 import { useState } from "react";
 import { Keypad } from "@/components/keypad";
+import { useT } from "@/components/language";
 import { AssetIcon, Card, Icon } from "@/components/phone";
-import { PoweredBy } from "@/components/powered-by";
 import { Sheet } from "@/components/sheet";
 import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
 import { units, type AssetInfo } from "@/lib/assets";
 import { fromBase64, toBase64 } from "@/lib/base64";
-import { splitCents, usd } from "@/lib/format";
+import { TRADE_FEE_BPS, tradeFee } from "@/lib/fees";
+import { exact, splitCents, usd } from "@/lib/format";
 import { newGift, saveGift, signWithGift } from "@/lib/gift-links";
 
 const MIN = 1;
@@ -19,6 +20,7 @@ const MIN = 1;
 export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; price?: number; cash: number; onClose: () => void }) {
   const { address, wallet } = useMofiWallet();
   const { signTransaction } = useSignTransaction();
+  const t = useT();
   const [amount, setAmount] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,20 +28,21 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
   const [copied, setCopied] = useState(false);
   const dollars = Number(amount) || 0;
   const [whole, cents] = splitCents(dollars);
+  const fee = tradeFee(dollars);
   const cashShown = usd(Math.floor(cash * 100) / 100);
-  const message = `I got you ${usd(dollars)} of ${asset.name} on Mofi. Open the link to claim it:`;
+  const message = t.gift.message(usd(dollars), asset.name);
 
   async function send() {
     setBusy(true);
     setError(null);
     try {
       const gift = await newGift().catch(() => {
-        throw new Error("This browser can't make gift links. Try the latest Chrome or Safari.");
+        throw new Error(t.gift.noBrowser);
       });
       // The link is saved (and read back) before anything moves, and never deleted, so a gift can't be lost even if
       // this tab closes mid-way or the reply fails after the buy landed. An empty one is simply hidden in Account.
       if (!address || !saveGift(address, { link: gift.link, symbol: asset.symbol, name: asset.name, amount: dollars, at: Date.now() })) {
-        throw new Error("This browser couldn't save the gift link, so nothing was sent.");
+        throw new Error(t.gift.notSaved);
       }
       // First the gift wallet's account opens, with Mofi as its only closer; the gift key signs that here.
       const prep = await postJson("/api/gift/prepare", { owner: address, gift: gift.address, symbol: asset.symbol, amount: dollars.toFixed(2) });
@@ -56,7 +59,7 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
       if (!done.ok) throw new Error(result.error);
       setLink(gift.link);
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : "This didn't go through, and your money didn't move. Try again.");
+      setError(e instanceof Error && e.message ? e.message : t.common.failed);
     } finally {
       setBusy(false);
     }
@@ -78,39 +81,46 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
   }
 
   return (
-    <Sheet label={`Gift ${asset.name}`} onClose={onClose}>
+    <Sheet label={t.gift.title(asset.name)} onClose={onClose}>
       {link ? (
         <>
           <span className="mt-4 flex size-16 items-center justify-center self-center rounded-full bg-gain-soft text-gain"><Icon name="gift" size={30} stroke={2} /></span>
           <div className="flex flex-col items-center gap-1 text-center">
-            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Your gift is ready</h2>
-            <p className="text-sm text-ink-muted">Anyone with this link can claim {usd(dollars)} of {asset.name}, so send it only to your friend.</p>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">{t.gift.ready}</h2>
+            <p className="text-sm text-ink-muted">{t.gift.readyText(usd(dollars), asset.name)}</p>
           </div>
-          <button type="button" onClick={share} className="cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">Share link</button>
-          <button type="button" onClick={copy} className="cursor-pointer rounded-full bg-card py-3.5 font-semibold">{copied ? "Copied" : "Copy link"}</button>
-          <p className="px-2 text-center text-xs text-ink-muted">It&apos;s also saved in Account, if you need it again.</p>
+          <button type="button" onClick={share} className="cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">{t.gift.share}</button>
+          <button type="button" onClick={copy} className="cursor-pointer rounded-full bg-card py-3.5 font-semibold">{copied ? t.common.copied : t.common.copyLink}</button>
+          <p className="px-2 text-center text-xs text-ink-muted">{t.gift.savedNote}</p>
         </>
       ) : (
         <>
           <div className="flex items-center gap-2.5">
             <AssetIcon asset={{ ticker: asset.symbol, logo: asset.logo }} size={32} />
-            <h2 className="flex-1 text-[17px] font-semibold">Gift {asset.name}</h2>
-            <button type="button" onClick={onClose} aria-label="Close" className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-card"><Icon name="plus" size={16} stroke={2.4} className="rotate-45" /></button>
+            <h2 className="flex-1 text-[17px] font-semibold">{t.gift.title(asset.name)}</h2>
+            <button type="button" onClick={onClose} aria-label={t.common.close} className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-card"><Icon name="plus" size={16} stroke={2.4} className="rotate-45" /></button>
           </div>
           <div className="flex flex-col items-center gap-1 py-3">
             <span className={`text-[64px] leading-none font-semibold tracking-[-0.05em] tabular-nums ${amount ? "" : "text-ink-faint"}`}>
               {whole}{amount.includes(".") && <span className="text-ink-faint">{cents}</span>}
             </span>
-            <span className="text-sm text-ink-muted tabular-nums">{price && dollars ? `About ${units(asset, dollars / price)}` : `From your cash · ${cashShown}`}</span>
+            <span className="text-sm text-ink-muted tabular-nums">{price && dollars ? t.trade.about(units(asset, (dollars - fee) / price, t.common.shares)) : t.gift.fromCash(cashShown)}</span>
           </div>
-          <Card className="px-4 py-3 text-sm text-ink-muted">You get a link to send. Your friend opens it, signs in with email, and it&apos;s theirs.</Card>
+          <Card className="px-4 py-0.5 text-sm">
+            {dollars > 0 && (
+              <div className="flex items-center justify-between border-b border-divider py-3">
+                <span className="text-ink-muted">{t.trade.fee(`${TRADE_FEE_BPS / 100}%`)}</span>
+                <span className="font-semibold tabular-nums">{exact(fee)}</span>
+              </div>
+            )}
+            <p className="py-3 text-ink-muted">{t.gift.howTo}</p>
+          </Card>
           <Keypad value={amount} onChange={(next) => { setAmount(next); setError(null); }} />
-          {dollars > cash && <p className="px-1 text-sm text-loss">You have {cashShown} in cash.</p>}
-          {error && <p className="px-1 text-sm text-loss">{error}</p>}
+          {dollars > cash && <p className="px-1 text-sm text-loss">{t.gift.youHave(cashShown)}</p>}
+          {error && <p className="px-1 text-sm text-loss">{t.serverError(error)}</p>}
           <button type="button" onClick={send} disabled={busy || dollars < MIN || dollars > cash} className="cursor-pointer rounded-full bg-ink py-4 text-base font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
-            {busy ? "Making your gift…" : dollars ? `Gift ${usd(dollars)} of ${asset.name}` : `Gift ${asset.name}`}
+            {busy ? t.gift.making : dollars ? t.gift.submit(usd(dollars), asset.name) : t.gift.title(asset.name)}
           </button>
-          <PoweredBy by="Bought on Jupiter · No network fee" />
         </>
       )}
     </Sheet>

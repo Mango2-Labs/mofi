@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { LanguageSwitch, useT } from "@/components/language";
 import { AssetIcon, Card, Icon, Money } from "@/components/phone";
 import { SignedIn, useMofiWallet } from "@/components/signed-in";
 import { ASSETS } from "@/lib/assets";
@@ -22,6 +23,7 @@ export default function AccountPage() {
 function Account() {
   const { address, email, logout } = useMofiWallet();
   const { portfolio } = usePortfolio(address);
+  const t = useT();
   const apy = usePoll<{ apy: number }>("/api/earn", 300_000).data?.apy;
   const [copied, setCopied] = useState(false);
   // This account's saved links, each checked on-chain from raw token balances: a claimed one (empty, and older than
@@ -48,24 +50,24 @@ function Account() {
   }, [address]);
   return (
     <>
-      <h1 className="text-center text-base font-semibold">Account</h1>
+      <h1 className="text-center text-base font-semibold">{t.account.title}</h1>
 
       <div className="flex flex-col gap-0.5 px-1 pt-2">
-        <span className="text-xs text-ink-muted">Cash</span>
+        <span className="text-xs text-ink-muted">{t.account.cash}</span>
         {portfolio ? <Money value={portfolio.cash} className="text-[44px] leading-[1.05]" /> : <span className="text-[44px] leading-[1.05] font-semibold text-ink-faint">$—</span>}
       </div>
 
       <div className="flex gap-2">
-        <Link href="/app/deposit" className="flex-1 rounded-full bg-ink py-3 text-center text-sm font-semibold text-on-ink">Deposit</Link>
-        <Link href="/app/withdraw" className="flex-1 rounded-full bg-card py-3 text-center text-sm font-semibold">Withdraw</Link>
-        <Link href="/app/borrow" className="flex-1 rounded-full bg-card py-3 text-center text-sm font-semibold">Borrow</Link>
+        <Link href="/app/deposit" className="flex-1 rounded-full bg-ink py-3 text-center text-sm font-semibold text-on-ink">{t.account.deposit}</Link>
+        <Link href="/app/withdraw" className="flex-1 rounded-full bg-card py-3 text-center text-sm font-semibold">{t.account.withdraw}</Link>
+        <Link href="/app/borrow" className="flex-1 rounded-full bg-card py-3 text-center text-sm font-semibold">{t.account.borrow}</Link>
       </div>
 
       <Link href="/app/earn" className="flex items-center gap-3 rounded-[18px] bg-card px-4 py-3">
         <span className="flex size-9 items-center justify-center rounded-full bg-gain text-white"><Icon name="rise" size={16} stroke={2.2} /></span>
         <span className="flex flex-1 flex-col leading-tight">
-          <span className="text-[15px] font-semibold">Earn</span>
-          <span className="text-xs text-ink-muted">{apy != null ? `${(apy * 100).toFixed(2)}% a year on idle cash` : "Interest on idle cash"}</span>
+          <span className="text-[15px] font-semibold">{t.account.earn}</span>
+          <span className="text-xs text-ink-muted">{apy != null ? t.account.earnRate((apy * 100).toFixed(2)) : t.account.earnPlain}</span>
         </span>
         {portfolio && portfolio.earn >= 0.01 && <span className="text-[15px] font-semibold tabular-nums">{usd(portfolio.earn)}</span>}
         <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
@@ -75,8 +77,8 @@ function Account() {
         <Link href="/app/explore?gift=1" className="flex items-center gap-3 py-3">
           <span className="flex size-9 items-center justify-center rounded-full bg-ink text-on-ink"><Icon name="gift" size={17} stroke={2} /></span>
           <span className="flex flex-1 flex-col leading-tight">
-            <span className="text-[15px] font-semibold">Send a gift</span>
-            <span className="text-xs text-ink-muted">Gift a stock or crypto as a link</span>
+            <span className="text-[15px] font-semibold">{t.account.sendGift}</span>
+            <span className="text-xs text-ink-muted">{t.account.sendGiftText}</span>
           </span>
           <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
         </Link>
@@ -86,11 +88,11 @@ function Account() {
             <div key={g.link} className="flex items-center gap-3 border-t border-divider py-3">
               {asset && <AssetIcon asset={{ ticker: asset.symbol, logo: asset.logo }} size={36} />}
               <a href={g.link} className="flex flex-1 flex-col leading-tight">
-                <span className="text-[15px] font-semibold">{usd(g.amount)} of {g.name}</span>
-                <span className="text-xs text-ink-muted">{g.checked ? "Not claimed yet" : "Couldn't check right now"} · {new Date(g.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                <span className="text-[15px] font-semibold">{t.account.giftOf(usd(g.amount), g.name)}</span>
+                <span className="text-xs text-ink-muted">{g.checked ? t.account.notClaimed : t.account.couldntCheck} · {new Date(g.at).toLocaleDateString(t.locale, { month: "short", day: "numeric" })}</span>
               </a>
               <button type="button" onClick={() => navigator.clipboard?.writeText(g.link).then(() => setCopiedGift(g.link), () => {})} className="cursor-pointer rounded-full bg-surface-app px-3.5 py-1.5 text-sm font-semibold">
-                {copiedGift === g.link ? "Copied" : "Copy link"}
+                {copiedGift === g.link ? t.common.copied : t.common.copyLink}
               </button>
             </div>
           );
@@ -99,22 +101,26 @@ function Account() {
 
       <Card className="px-4 py-1 text-sm">
         <div className="flex items-center justify-between gap-3 border-b border-divider py-3">
-          <span className="text-ink-muted">Email</span>
+          <span className="text-ink-muted">{t.account.email}</span>
           <span className="truncate font-semibold">{email}</span>
         </div>
         {address && (
           <div className="flex items-center justify-between gap-3 py-3">
             <span className="flex min-w-0 flex-col">
-              <span className="text-ink-muted">Your Mofi address on Solana</span>
+              <span className="text-ink-muted">{t.account.address}</span>
               <span className="font-mono text-[13px] font-medium">{address.slice(0, 6)}…{address.slice(-6)}</span>
             </span>
             <button type="button" onClick={() => navigator.clipboard?.writeText(address).then(() => setCopied(true), () => {})} className="cursor-pointer rounded-full bg-surface-app px-4 py-2 font-semibold">
-              {copied ? "Copied" : "Copy"}
+              {copied ? t.common.copied : t.common.copy}
             </button>
           </div>
         )}
+        <div className="flex items-center justify-between gap-3 border-t border-divider py-3">
+          <span className="text-ink-muted">{t.common.language}</span>
+          <LanguageSwitch />
+        </div>
       </Card>
-      <button type="button" onClick={logout} className="cursor-pointer rounded-full bg-card py-3.5 font-semibold">Sign out</button>
+      <button type="button" onClick={logout} className="cursor-pointer rounded-full bg-card py-3.5 font-semibold">{t.account.signOut}</button>
     </>
   );
 }

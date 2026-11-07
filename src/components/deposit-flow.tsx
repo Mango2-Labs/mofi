@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Logo } from "@/components/chain-select";
+import { useT } from "@/components/language";
 import { Card, Icon } from "@/components/phone";
 import { PoweredBy } from "@/components/powered-by";
 import { QrCode } from "@/components/qr-code";
@@ -37,6 +38,7 @@ function Heading({ title, sub }: { title: string; sub: string }) {
 export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { need?: number; onBack?: () => void; onPicked?: (p: Picked) => void; onUnpick?: () => void; children?: ReactNode }) {
   const { address } = useMofiWallet();
   const prices = usePrices();
+  const t = useT();
   const { data: list0, error: listError } = usePoll<AuroraAsset[]>("/api/assets", 600_000);
   // While Aurora is down, USDC on Solana still works: it goes straight to the user's own address.
   const aurora = !(listError && !list0);
@@ -61,7 +63,7 @@ export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { ne
   const send = need ?? 0;
   const priceOf = (c: string) => prices?.[ASSETS.find((x) => x.kind === "crypto" && x.symbol === c)?.mint ?? ""]?.usdPrice;
   const amountText = (c: string) =>
-    /^USD/.test(c) ? `${send.toFixed(2)} ${c}` : priceOf(c) ? `${(send / priceOf(c)!).toLocaleString("en-US", { maximumSignificantDigits: 4 })} ${c}` : `${usd(send)} of ${c}`;
+    /^USD/.test(c) ? `${send.toFixed(2)} ${c}` : priceOf(c) ? `${(send / priceOf(c)!).toLocaleString("en-US", { maximumSignificantDigits: 4 })} ${c}` : t.deposit.amountOf(usd(send), c);
 
   async function pick(chain: string) {
     setError(null);
@@ -78,7 +80,7 @@ export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { ne
       if (res.ok) choose({ address: data.depositAddress, memo: data.memo });
       else setError(data.error);
     } catch {
-      setError("Couldn't reach Mofi. Check your connection.");
+      setError(t.common.unreachable);
     } finally {
       setBusy(null);
     }
@@ -89,7 +91,7 @@ export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { ne
   return (
     <>
       {back && (
-        <button type="button" onClick={back} aria-label="Back" className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-card">
+        <button type="button" onClick={back} aria-label={t.common.back} className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-card">
           <Icon name="back" size={16} stroke={2.2} />
         </button>
       )}
@@ -103,8 +105,8 @@ export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { ne
               </span>
             ))}
           </div>
-          <Heading title={need ? `Deposit ${usd(send)}` : "Deposit"} sub="Send from any wallet or exchange." />
-          {!aurora && <p className="rounded-[18px] bg-card px-4 py-3 text-sm text-ink-muted">Aurora isn&apos;t answering right now, so only USDC on Solana works. Other chains come back when it does.</p>}
+          <Heading title={need ? t.deposit.titleAmount(usd(send)) : t.deposit.title} sub={t.deposit.sub} />
+          {!aurora && <p className="rounded-[18px] bg-card px-4 py-3 text-sm text-ink-muted">{t.deposit.auroraDown}</p>}
           <Card className="px-3 py-0.5">
             {shown.map((c) => (
               <button key={c} type="button" onClick={() => setCoin(c)} className="flex cursor-pointer items-center gap-3 border-b border-divider py-3 text-left last:border-0">
@@ -113,15 +115,15 @@ export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { ne
                   <span className="text-[15px] font-semibold">{COIN_NAMES[c] ?? c}</span>
                   <span className="text-xs text-ink-muted">{c}</span>
                 </span>
-                <span className="text-[13px] text-ink-muted">{networksOf(c).length} {networksOf(c).length === 1 ? "network" : "networks"}</span>
+                <span className="text-[13px] text-ink-muted">{t.deposit.networks(networksOf(c).length)}</span>
                 <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
               </button>
             ))}
             {!more && list.length > shown.length && (
               <button type="button" onClick={() => setMore(true)} className="flex cursor-pointer items-center gap-3 py-3 text-left">
                 <span className="flex size-9 items-center justify-center rounded-full bg-surface-app"><Icon name="plus" size={15} stroke={2.4} /></span>
-                <span className="flex-1 text-[15px] font-semibold">More coins</span>
-                <span className="text-[13px] text-ink-muted">{list.length - shown.length} more</span>
+                <span className="flex-1 text-[15px] font-semibold">{t.deposit.moreCoins}</span>
+                <span className="text-[13px] text-ink-muted">{t.deposit.more(list.length - shown.length)}</span>
               </button>
             )}
           </Card>
@@ -131,44 +133,44 @@ export function DepositFlow({ need, onBack, onPicked, onUnpick, children }: { ne
       {coin && !picked && (
         <>
           <span className="self-center"><Logo src={logoOf(coin)} label={coin} size={72} /></span>
-          <Heading title="Choose network" sub={`Send ${coin} on the network you pick here.`} />
+          <Heading title={t.deposit.chooseNetwork} sub={t.deposit.chooseSub(coin)} />
           <Card className="px-3 py-0.5">
             {networksOf(coin).map((c) => (
               <button key={c} type="button" onClick={() => pick(c)} disabled={!!busy} className="flex cursor-pointer items-center gap-3 border-b border-divider py-3 text-left last:border-0 disabled:cursor-default">
                 <Logo src={CHAINS[c]?.logo} label={chainName(c)} size={36} />
                 <span className="flex-1 text-[15px] font-semibold">{chainName(c)}</span>
-                {busy === c ? <span className="text-[13px] text-ink-muted">One moment…</span> : <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />}
+                {busy === c ? <span className="text-[13px] text-ink-muted">{t.deposit.oneMoment}</span> : <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />}
               </button>
             ))}
           </Card>
-          {error && <p className="px-1 text-sm text-loss">{error}</p>}
+          {error && <p className="px-1 text-sm text-loss">{t.serverError(error)}</p>}
         </>
       )}
 
       {coin && picked && (
         <>
-          <Heading title={need ? `Send ${amountText(coin)}` : `Deposit ${coin}`} sub={`Only ${coin} on ${chainName(picked.chain)}, to this address.`} />
+          <Heading title={need ? t.deposit.sendAmount(amountText(coin)) : t.deposit.coinTitle(coin)} sub={t.deposit.only(coin, chainName(picked.chain))} />
           <Card className="items-center gap-4 p-5">
             <div className="relative">
-              <QrCode value={picked.address} size={196} />
+              <QrCode value={picked.address} label={t.common.qr} size={196} />
               <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white bg-white">
                 <Logo src={logoOf(coin)} label={coin} size={36} />
               </span>
             </div>
             <div className="flex w-full items-center gap-3 border-t border-dashed border-line pt-3">
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-xs text-ink-muted">Your {chainName(picked.chain)} address</span>
+                <span className="text-xs text-ink-muted">{t.common.yourAddress(chainName(picked.chain))}</span>
                 <span className="font-mono text-[13px] font-medium break-all">{picked.address}</span>
               </span>
               <button type="button" onClick={() => navigator.clipboard?.writeText(picked.address).then(() => setCopied(true), () => {})} className="h-10 shrink-0 cursor-pointer rounded-full bg-ink px-4 text-sm font-semibold text-on-ink">
-                {copied ? "Copied" : "Copy"}
+                {copied ? t.common.copied : t.common.copy}
               </button>
             </div>
-            {picked.memo && <span className="w-full text-sm">Memo, required: <span className="font-mono">{picked.memo}</span></span>}
+            {picked.memo && <span className="w-full text-sm">{t.deposit.memo} <span className="font-mono">{picked.memo}</span></span>}
           </Card>
-          {EVM_CHAINS.includes(picked.chain) && <p className="px-2 text-center text-xs text-ink-muted">The same address works on Base, Ethereum and other EVM chains.</p>}
+          {EVM_CHAINS.includes(picked.chain) && <p className="px-2 text-center text-xs text-ink-muted">{t.deposit.evm}</p>}
           {children}
-          {picked.chain !== "sol" && <PoweredBy by="Moved by Aurora Intents" />}
+          {picked.chain !== "sol" && <PoweredBy by={t.deposit.by} />}
         </>
       )}
     </>

@@ -1,23 +1,17 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import type { Asset } from "@/lib/examples";
-import { pct, splitCents, usd } from "@/lib/format";
+import { pct, priceUsd, splitCents, usd } from "@/lib/format";
 
 const ICONS = {
   back: <path d="M15 5l-7 7 7 7" />,
   next: <path d="M9 5l7 7-7 7" />,
   down: <path d="M6 9l6 6 6-6" />,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></>,
-  bell: <><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
-  up: <><path d="M12 19V5" /><path d="M6 11l6-6 6 6" /></>,
   rise: <><path d="M7 17L17 7" /><path d="M9 7h8v8" /></>,
-  star: <path d="M12 4l2.5 5.2 5.5.8-4 3.9.9 5.6L12 16.9 7.1 19.5l.9-5.6-4-3.9 5.5-.8z" />,
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
-  mail: <><rect x="3.5" y="5.5" width="17" height="13" rx="2" /><path d="M4 7l8 6 8-6" /></>,
-  home: <path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z" />,
-  invest: <path d="M4 16l5-5 4 4 7-8" />,
-  friends: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 19c1-3.2 3.5-5 6.5-5s5.5 1.8 6.5 5" /><circle cx="17" cy="9" r="2.8" /><path d="M16.5 14.2c2.4.3 4.2 1.9 5 4.8" /></>,
+  hidden: <><path d="M3 3l18 18" /><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c5 0 8.5 4.5 9.5 6a17 17 0 0 1-3.1 3.5M6.6 6.6C4.6 8 3.2 10 2.5 12c1 1.5 4.5 6 9.5 6 1.5 0 2.9-.4 4.1-1" /><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" /></>,
   account: <><circle cx="12" cy="8" r="4" /><path d="M4 20c1.5-4 4.5-6 8-6s6.5 2 8 6" /></>,
   lock: <><rect x="4.5" y="10.5" width="15" height="10" rx="2" /><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" /></>,
   bank: <><path d="M4 20h16" /><path d="M6 20V10M10 20V10M14 20V10M18 20V10" /><path d="M3 10l9-6 9 6z" /></>,
@@ -99,7 +93,8 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   return <div className={`flex flex-col rounded-[18px] bg-card ${className}`}>{children}</div>;
 }
 
-export function AssetRow({ asset, sub }: { asset: Asset; sub?: string }) {
+// With `price`, the value is a price per share or coin rather than an amount held.
+export function AssetRow({ asset, sub, price = false }: { asset: Asset; sub?: string; price?: boolean }) {
   return (
     <div className="flex items-center gap-2.5 border-b border-divider py-[9px] last:border-0">
       <AssetIcon asset={asset} />
@@ -108,7 +103,7 @@ export function AssetRow({ asset, sub }: { asset: Asset; sub?: string }) {
         <span className="text-[11px] text-ink-muted">{sub ?? asset.ticker}</span>
       </span>
       <span className="flex flex-col items-end leading-tight tabular-nums">
-        <span className="text-[13px] font-semibold">{usd(asset.value)}</span>
+        <span className="text-[13px] font-semibold">{price ? priceUsd(asset.value) : usd(asset.value)}</span>
         <Change value={asset.change} className="text-[11px]" />
       </span>
     </div>
@@ -120,29 +115,5 @@ export function Pill({ children, dark = false, className = "" }: { children: Rea
     <span className={`flex items-center justify-center gap-1.5 rounded-full py-3 text-[13px] font-semibold ${dark ? "bg-ink text-on-ink" : "bg-card text-ink"} ${className}`}>
       {children}
     </span>
-  );
-}
-
-const TABS = [["Home", "home"], ["Invest", "invest"], ["Friends", "friends"], ["Account", "account"]] as const;
-
-export function TabBar({ active }: { active: (typeof TABS)[number][0] }) {
-  return (
-    <div className="mt-auto grid grid-cols-4 gap-1 text-[10.5px] font-medium text-ink-muted">
-      {TABS.map(([label, icon]) => (
-        <span key={label} className={`flex flex-col items-center gap-0.5 rounded-full py-1.5 ${label === active ? "bg-line text-ink" : ""}`}>
-          <Icon name={icon} size={18} stroke={1.9} />
-          {label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-export function Spark({ path, up, height = 34 }: { path: string; up: boolean; height?: number }) {
-  return (
-    <svg viewBox="0 0 100 34" width="100%" height={height} preserveAspectRatio="none" aria-hidden>
-      <path d={`${path} L100 34 L0 34 Z`} className={up ? "fill-gain-soft" : "fill-loss-soft"} />
-      <path d={path} fill="none" strokeWidth="1.6" className={up ? "stroke-gain" : "stroke-loss"} />
-    </svg>
   );
 }

@@ -2,17 +2,14 @@ import { guard } from "@/lib/server/auth";
 import { AuroraError, assets, createQuote } from "@/lib/server/aurora";
 import { feeWallet, payUsdc } from "@/lib/server/fee-payer";
 import { SOL_USDC_ASSET, chainName, isSolanaAddress, looksLikeAddress, toBaseUnits } from "@/lib/chains";
-import { CASH_OUT_NETWORK_FEE } from "@/lib/fees";
 import { usd } from "@/lib/format";
 
 const fail = (message: string, status = 400) => Response.json({ error: message }, { status });
 
-// The flat network fee covers what the fee wallet spends in SOL on each withdrawal.
-const NETWORK_FEE = BigInt(Math.round(CASH_OUT_NETWORK_FEE * 1e6));
-
 // Aurora gives a Solana deposit address that pays out on the chosen chain. The server builds the
 // user's USDC transfer to it in the same request, so the fee wallet never signs for an address a client chose.
-// `amount` is everything taken from the user's cash: the network fee, and Aurora gets the rest.
+// Mofi charges nothing: the fee wallet pays the Solana fee and opens the address's USDC account.
+// `amount` is everything taken from the user's cash, all of it sent to Aurora.
 // With `compare`, `amount` is what should arrive instead. It prices the withdrawal with and without Private
 // (dry quotes, no deposit address) and returns the total to take, fees on top, before the user taps Withdraw.
 export async function POST(req: Request) {
@@ -56,7 +53,7 @@ export async function POST(req: Request) {
         const q = await quote(BigInt(amount), privately, true);
         const cost = Math.max(0, want - q.amountOutUsd);
         return {
-          total: Math.ceil((want + cost + CASH_OUT_NETWORK_FEE) * 1000) / 1000,
+          total: Math.ceil((want + cost) * 1000) / 1000,
           amountOut: q.amountOutUsd > 0 ? (Number(q.amountOut) * want) / q.amountOutUsd : Number(q.amountOut),
           timeEstimate: q.timeEstimate,
         };
@@ -65,9 +62,8 @@ export async function POST(req: Request) {
       // private is null when there's no private route for this coin right now.
       return Response.json({ plain, private: hidden });
     }
-    const send = BigInt(amount) - NETWORK_FEE;
-    const q = await quote(send, body?.private === true, false);
-    const transaction = await payUsdc(owner, q.depositAddress, send, NETWORK_FEE);
+    const q = await quote(BigInt(amount), body?.private === true, false);
+    const transaction = await payUsdc(owner, q.depositAddress, BigInt(amount));
     return Response.json({ transaction, depositAddress: q.depositAddress, amountOut: q.amountOut, timeEstimate: q.timeEstimate });
   } catch (e) {
     return fail(e instanceof AuroraError ? e.message : "Something went wrong. Try again.", 502);

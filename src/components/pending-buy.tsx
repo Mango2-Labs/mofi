@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useT } from "@/components/language";
 import { Icon } from "@/components/phone";
 import { useMofiWallet } from "@/components/signed-in";
 import { ASSETS } from "@/lib/assets";
@@ -51,6 +52,7 @@ export const usePendingBuy = () => useContext(PendingBuyContext)!;
 export function PendingBuyProvider({ children }: { children: ReactNode }) {
   const { address, wallet } = useMofiWallet();
   const { order, execute } = useTrade();
+  const t = useT();
   const [pending, setPending] = useState<PendingBuy | null>(() => (typeof window === "undefined" ? null : load()));
   const [result, setResult] = useState<BuyResult | null>(null);
   const [shown, setShown] = useState(false);
@@ -69,7 +71,7 @@ export function PendingBuyProvider({ children }: { children: ReactNode }) {
         const signature = await execute(await order("buy", pending.symbol, spend.toFixed(2)));
         setResult({ status: "done", symbol: pending.symbol, spent: spend, signature });
       } catch (e) {
-        setResult({ status: "failed", symbol: pending.symbol, error: e instanceof TradeError ? e.message : "The buy didn't go through." });
+        setResult({ status: "failed", symbol: pending.symbol, error: e instanceof TradeError ? e.message : t.trade.buyDidntGoThrough });
       } finally {
         save(null);
         setPending(null);
@@ -77,7 +79,7 @@ export function PendingBuyProvider({ children }: { children: ReactNode }) {
       }
     };
     buy();
-  }, [pending, portfolio, wallet, order, execute]);
+  }, [pending, portfolio, wallet, order, execute, t]);
 
   const value: Context = {
     pending,
@@ -102,10 +104,10 @@ export function PendingBuyProvider({ children }: { children: ReactNode }) {
         <div role="status" className="fixed inset-x-4 bottom-24 z-40 mx-auto flex max-w-[408px] items-start gap-3 rounded-[18px] bg-ink p-4 text-sm text-on-ink shadow-[0_16px_40px_rgba(10,10,11,0.25)]">
           <span className="flex-1">
             {result.status === "done"
-              ? `Your deposit landed and Mofi bought ${usd(result.spent)} of ${name(result.symbol)}.`
-              : `Your deposit landed as cash, but buying ${name(result.symbol)} didn't go through: ${result.error}`}
+              ? t.trade.toastDone(usd(result.spent), name(result.symbol))
+              : t.trade.toastFailed(name(result.symbol), t.serverError(result.error))}
           </span>
-          <button type="button" onClick={value.dismiss} aria-label="Close" className="cursor-pointer opacity-70 hover:opacity-100"><Icon name="plus" size={16} stroke={2.4} className="rotate-45" /></button>
+          <button type="button" onClick={value.dismiss} aria-label={t.common.close} className="cursor-pointer opacity-70 hover:opacity-100"><Icon name="plus" size={16} stroke={2.4} className="rotate-45" /></button>
         </div>
       )}
     </PendingBuyContext.Provider>

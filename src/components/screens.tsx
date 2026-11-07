@@ -1,33 +1,23 @@
+"use client";
+
+import Image from "next/image";
 import type { ReactNode } from "react";
+import { useT } from "@/components/language";
 import { Wordmark } from "@/components/logo";
-import { AssetIcon, AssetRow, Card, Change, Header, Icon, Money, Pill, Spark, TabBar, TokenIcon } from "@/components/phone";
-import { cash, holdings, popular, readyMade, sources, total } from "@/lib/examples";
-import { usd } from "@/lib/format";
+import { AssetIcon, AssetRow, Card, Header, Icon, Money, Pill } from "@/components/phone";
+import { KINDS } from "@/lib/assets";
+import { TRADE_FEE_BPS, tradeFee } from "@/lib/fees";
+import { cash, coins, earning, explore, portfolio, spacex, total } from "@/lib/examples";
+import { exact, pct, usd } from "@/lib/format";
 
-const SPARKS = [
-  "M0 26 L10 24 L20 25 L30 20 L40 21 L50 16 L60 18 L70 12 L80 13 L90 8 L100 6",
-  "M0 22 L10 25 L20 18 L30 20 L40 14 L50 17 L60 11 L70 14 L80 9 L90 10 L100 5",
-  "M0 8 L10 10 L20 9 L30 14 L40 12 L50 17 L60 15 L70 20 L80 19 L90 24 L100 25",
-];
+// Example screens for the landing page, drawn like the app's own screens.
 
-const SPACEX = { ticker: "SPCX", logo: "/logos/stocks/spcx.svg" };
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Group({ label, value, children }: { label: string; value?: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[11.5px] text-ink-muted">{label}</span>
+      <span className="flex justify-between px-0.5 text-[13px] font-semibold">{label}{value && <span className="tabular-nums">{value}</span>}</span>
       {children}
     </div>
-  );
-}
-
-function Selector({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <span className="flex items-center gap-2 rounded-full bg-card py-2 pr-3 pl-2">
-      {icon}
-      <span className="flex-1 text-[13px] font-semibold">{label}</span>
-      <Icon name="down" size={14} stroke={2.2} className="text-ink-muted" />
-    </span>
   );
 }
 
@@ -44,11 +34,32 @@ function Rows({ rows }: { rows: [string, string][] }) {
   );
 }
 
-function Avatar({ letter, size = 30 }: { letter: string; size?: number }) {
+function Caption({ children }: { children: ReactNode }) {
+  return <span className="self-center text-[10.5px] text-ink-faint">{children}</span>;
+}
+
+function Done({ icon, className = "" }: { icon: "check" | "gift"; className?: string }) {
+  return <span className={`flex size-14 shrink-0 items-center justify-center self-center rounded-full bg-gain-soft text-gain ${className}`}><Icon name={icon} size={26} stroke={2.2} /></span>;
+}
+
+function Back() {
+  return <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-card"><Icon name="back" size={15} stroke={2.2} /></span>;
+}
+
+const TABS = [["explore", "explore"], ["portfolio", "wallet"], ["activity", "activity"], ["account", "account"]] as const;
+
+// The app's floating tab bar.
+function TabBar({ active }: { active: (typeof TABS)[number][0] }) {
+  const t = useT();
   return (
-    <span style={{ width: size, height: size }} className="flex shrink-0 items-center justify-center rounded-full bg-line text-[11px] font-semibold">
-      {letter}
-    </span>
+    <div className="absolute inset-x-2.5 bottom-2.5 grid grid-cols-4 gap-0.5 rounded-full bg-card p-1 text-[10px] font-medium text-ink-muted shadow-[0_8px_24px_rgba(10,10,11,0.12)]">
+      {TABS.map(([tab, icon]) => (
+        <span key={tab} className={`flex flex-col items-center gap-0.5 rounded-full py-1.5 ${tab === active ? "bg-surface-app text-ink" : ""}`}>
+          <Icon name={icon} size={17} stroke={1.9} />
+          {t.tabs[tab]}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -63,400 +74,319 @@ function Qr() {
   );
 }
 
-export function HomeScreen() {
+export function PortfolioScreen() {
+  const t = useT();
+  const held = portfolio.flatMap((g) => g.items);
+  const invested = held.reduce((sum, a) => sum + a.value, 0);
+  const today = held.reduce((sum, a) => sum + (a.value * a.change) / (100 + a.change), 0);
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Avatar letter="R" size={32} />
-        <span className="flex h-[34px] flex-1 items-center gap-1.5 rounded-full bg-card px-3 text-[13px] text-ink-muted">
-          <Icon name="search" size={14} />Search stocks
+      <span className="text-center text-[13px] font-semibold">{t.portfolio.title}</span>
+      <div className="flex flex-col px-0.5">
+        <span className="text-[11px] text-ink-muted">{t.portfolio.total}</span>
+        <Money value={total} className="text-[38px] leading-[1.1]" />
+        <span className="text-[11.5px] font-medium text-gain tabular-nums">
+          +{usd(today)} ({pct((today / (invested - today)) * 100)}) <span className="font-normal text-ink-muted">{t.common.today}</span>
         </span>
-        <span className="flex size-[34px] items-center justify-center rounded-full bg-card"><Icon name="bell" stroke={1.8} /></span>
       </div>
-      <div className="flex flex-col px-0.5 pt-1.5">
-        <span className="text-xs text-ink-muted">Total value</span>
-        <Money value={total} className="text-[40px] leading-[1.1]" />
-        <span className="flex items-center gap-1 text-xs font-medium text-gain tabular-nums">
-          <Icon name="rise" size={12} stroke={2.6} />$41.20 (3.3%) <span className="font-normal text-ink-muted">this month</span>
-        </span>
-        <span className="text-xs text-ink-muted tabular-nums">≈ Rp 21.194.250</span>
-      </div>
-      <div className="flex gap-2">
-        <Pill dark className="flex-1 py-[11px]"><Icon name="plus" size={14} stroke={2.4} />Deposit</Pill>
-        <Pill className="flex-1 py-[11px]"><Icon name="up" size={14} stroke={2.2} />Withdraw</Pill>
-      </div>
-      <div className="flex items-center gap-2.5 rounded-[18px] bg-card px-3 py-[11px]">
-        <TokenIcon token="/logos/usdt.png" chain="/logos/tron.png" size={32} />
-        <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="text-[13px] font-semibold">250 USDT arrived</span>
-          <span className="text-[11.5px] text-ink-muted tabular-nums">From Tron · $249.40</span>
-        </span>
-        <span className="rounded-full bg-ink px-3 py-[7px] text-xs font-semibold text-on-ink">Invest</span>
-      </div>
-      <span className="px-0.5 text-[13px] font-semibold">Holdings</span>
-      <Card className="px-3 py-0.5">
-        {holdings.map((asset) => <AssetRow key={asset.ticker} asset={asset} />)}
-        <div className="flex items-center gap-2.5 py-[9px]">
-          <span className="flex size-[30px] items-center justify-center rounded-full bg-gain-soft text-sm font-semibold text-gain">$</span>
-          <span className="flex flex-1 flex-col leading-tight">
-            <span className="text-[13px] font-semibold">Cash</span>
-            <span className="text-[11px] text-ink-muted">Earning interest</span>
+      {portfolio.map((g) => (
+        <Group key={g.kind} label={t.kinds[g.kind]} value={usd(g.items.reduce((s, a) => s + a.value, 0))}>
+          <Card className="px-3 py-0.5">{g.items.map((a) => <AssetRow key={a.ticker} asset={a} />)}</Card>
+        </Group>
+      ))}
+      <Group label={t.portfolio.cash} value={usd(earning + cash)}>
+        <Card className="px-3 py-0.5 text-[13px] font-semibold tabular-nums">
+          <span className="flex items-center gap-2.5 border-b border-divider py-2.5">
+            <span className="flex size-6 items-center justify-center rounded-full bg-gain-soft text-gain"><Icon name="rise" size={12} stroke={2.4} /></span>
+            <span className="flex-1">{t.portfolio.earning}</span>{usd(earning)}
           </span>
-          <span className="text-[13px] font-semibold tabular-nums">{usd(cash)}</span>
-        </div>
-      </Card>
-      <TabBar active="Home" />
+          <span className="flex items-center gap-2.5 py-2.5">
+            <span className="flex size-6 items-center justify-center rounded-full bg-gain-soft text-[11px] text-gain">$</span>
+            <span className="flex-1">{t.portfolio.ready}</span>{usd(cash)}
+          </span>
+        </Card>
+      </Group>
+      <TabBar active="portfolio" />
     </>
   );
 }
 
-export function ChainPickerScreen() {
+export function ExploreScreen() {
+  const t = useT();
   return (
     <>
-      <Header title="Deposit" />
-      <span className="px-0.5 text-[13px] font-semibold">Send from</span>
+      <span className="px-0.5 text-xl font-semibold tracking-[-0.03em]">{t.explore.title}</span>
+      <span className="flex h-9 shrink-0 items-center gap-2 rounded-full bg-card px-3.5 text-xs text-ink-faint">
+        <Icon name="search" size={14} className="text-ink-muted" />{t.explore.search}
+      </span>
+      <div className="flex shrink-0 gap-1.5 overflow-hidden text-[11.5px] font-medium">
+        {[t.explore.all, ...KINDS.map((k) => t.kinds[k])].map((chip, i) => (
+          <span key={chip} className={`shrink-0 rounded-full px-3 py-1.5 ${i === 0 ? "bg-ink text-on-ink" : "bg-card"}`}>{chip}</span>
+        ))}
+      </div>
+      {explore.map((g) => (
+        <Group key={g.kind} label={t.kinds[g.kind]}>
+          <Card className="px-3 py-0.5">{g.items.map((a) => <AssetRow key={a.ticker} asset={a} sub={g.kind === "prestock" ? t.common.privateCompany : undefined} price />)}</Card>
+        </Group>
+      ))}
+      <TabBar active="explore" />
+    </>
+  );
+}
+
+function Keys() {
+  return (
+    <div className="grid grid-cols-3 text-center text-[19px] font-medium">
+      {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0"].map((k) => <span key={k} className="py-1.5">{k}</span>)}
+      <span className="flex items-center justify-center"><Icon name="back" size={17} stroke={2} /></span>
+    </div>
+  );
+}
+
+// An amount sheet over SpaceX's screen, as Buy and Gift open it.
+function AmountSheet({ title, amount, children }: { title: string; amount: number; children: ReactNode }) {
+  const t = useT();
+  const fee = tradeFee(amount);
+  return (
+    <>
+      <div className="flex items-center gap-2 px-0.5"><AssetIcon asset={spacex} size={24} /><span className="text-sm font-semibold">SpaceX</span></div>
+      <Money value={spacex.value} className="px-0.5 text-[34px] leading-[1.1]" />
+      <div className="absolute inset-0 bg-ink/30" />
+      <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2.5 rounded-t-[30px] bg-surface-app px-3.5 pt-2 pb-3.5">
+        <span className="h-1 w-9 self-center rounded-full bg-line" />
+        <div className="flex items-center gap-2">
+          <AssetIcon asset={spacex} size={26} />
+          <span className="flex-1 text-sm font-semibold">{title}</span>
+          <span className="flex size-7 items-center justify-center rounded-full bg-card"><Icon name="plus" size={13} stroke={2.4} className="rotate-45" /></span>
+        </div>
+        <div className="flex flex-col items-center py-1">
+          <span className="text-[44px] leading-none font-semibold tracking-[-0.05em] tabular-nums">${amount}</span>
+          <span className="pt-1 text-[11.5px] text-ink-muted tabular-nums">{t.trade.about(`${((amount - fee) / spacex.value).toFixed(4)} ${t.common.shares}`)} · {t.trade.fee(`${TRADE_FEE_BPS / 100}%`)} {exact(fee)}</span>
+        </div>
+        {children}
+        <Keys />
+      </div>
+    </>
+  );
+}
+
+export function BuyScreen() {
+  const t = useT();
+  return (
+    <AmountSheet title={t.trade.title("buy", "SpaceX")} amount={50}>
+      <div className="flex items-center gap-2.5 rounded-[16px] bg-card px-3 py-2">
+        <span className="flex size-7 items-center justify-center rounded-full bg-gain-soft text-xs font-semibold text-gain">$</span>
+        <span className="flex flex-1 flex-col leading-tight">
+          <span className="text-[10.5px] text-ink-muted">{t.trade.payWith}</span>
+          <span className="text-[13px] font-semibold tabular-nums">{t.trade.cash(usd(cash))}</span>
+        </span>
+        <span className="rounded-full bg-surface-app px-3 py-1 text-[11px] font-semibold">{t.common.max}</span>
+      </div>
+      <Pill dark className="order-last">{t.trade.submit("buy", "$50.00")}</Pill>
+    </AmountSheet>
+  );
+}
+
+export function DepositCoinsScreen() {
+  const t = useT();
+  return (
+    <>
+      <Back />
+      <div className="flex justify-center">
+        {[...coins.map((c) => c.logo), "/logos/solana.png"].map((logo) => (
+          <Image key={logo} src={logo} alt="" width={34} height={34} className="-mx-1 rounded-full bg-card ring-2 ring-surface-app" />
+        ))}
+      </div>
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-lg font-semibold tracking-[-0.02em]">{t.deposit.title}</span>
+        <span className="text-[11.5px] text-ink-muted">{t.deposit.sub}</span>
+      </div>
       <Card className="px-3 py-0.5">
-        {sources.map((s) => (
-          <div key={s.token + s.chain} className="flex items-center gap-2.5 border-b border-divider py-[9px] last:border-0">
-            <TokenIcon token={s.tokenLogo} chain={s.chainLogo} />
+        {coins.map((c) => (
+          <div key={c.symbol} className="flex items-center gap-2.5 border-b border-divider py-2">
+            <Image src={c.logo} alt="" width={30} height={30} className="rounded-full" />
             <span className="flex flex-1 flex-col leading-tight">
-              <span className="text-[13px] font-semibold">{s.token}</span>
-              <span className="text-[11px] text-ink-muted">on {s.chain}</span>
+              <span className="text-[13px] font-semibold">{c.name}</span>
+              <span className="text-[11px] text-ink-muted">{c.symbol}</span>
             </span>
-            <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
+            <span className="text-[11px] text-ink-muted">{t.deposit.networks(c.networks)}</span>
+            <Icon name="next" size={13} stroke={2.2} className="text-ink-faint" />
           </div>
         ))}
+        <div className="flex items-center gap-2.5 py-2">
+          <span className="flex size-[30px] items-center justify-center rounded-full bg-surface-app"><Icon name="plus" size={14} stroke={2.2} /></span>
+          <span className="flex-1 text-[13px] font-semibold">{t.deposit.moreCoins}</span>
+          <span className="text-[11px] text-ink-muted">{t.deposit.more("100+")}</span>
+        </div>
       </Card>
-      <span className="mt-auto self-center text-xs text-ink-muted">You can withdraw to any of these</span>
     </>
   );
 }
 
-export function AddMoneyScreen() {
+export function DepositAddressScreen() {
+  const t = useT();
   return (
     <>
-      <Header title="Deposit" />
-      <Field label="From">
-        <Selector icon={<TokenIcon token="/logos/usdt.png" chain="/logos/tron.png" size={28} />} label="USDT on Tron" />
-      </Field>
-      <div className="flex flex-col px-0.5 py-1">
-        <span className="text-[34px] leading-[1.1] font-semibold tracking-[-0.04em] tabular-nums">250 <span className="text-ink-faint">USDT</span></span>
-        <span className="text-xs text-ink-muted tabular-nums">You get about $249.40</span>
+      <Back />
+      <div className="flex flex-col items-center gap-0.5">
+        <span className="text-lg font-semibold tracking-[-0.02em]">{t.deposit.coinTitle("USDT")}</span>
+        <span className="text-[11.5px] text-ink-muted">{t.deposit.only("USDT", "Tron")}</span>
       </div>
       <Card className="items-center gap-3 p-3.5">
-        <Qr />
+        <span className="relative">
+          <Qr />
+          <Image src="/logos/usdt.png" alt="" width={26} height={26} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-3 ring-white" />
+        </span>
+        <span className="w-full border-t border-dashed border-line" />
         <div className="flex w-full items-center justify-between gap-2">
           <span className="flex min-w-0 flex-col leading-snug">
-            <span className="text-[11px] text-ink-muted">Send to this Tron address</span>
-            <span className="font-mono text-[13px] font-medium">TQ7h…k2Fp</span>
+            <span className="text-[11px] text-ink-muted">{t.common.yourAddress("Tron")}</span>
+            <span className="font-mono text-[13px] font-medium">TQ7hX2…k2Fp</span>
           </span>
-          <span className="rounded-full bg-surface-app px-3 py-1.5 text-xs font-semibold">Copy</span>
+          <span className="rounded-full bg-ink px-3.5 py-1.5 text-xs font-semibold text-on-ink">{t.common.copy}</span>
         </div>
       </Card>
-      <span className="mt-auto flex items-center gap-2 self-center text-xs text-ink-muted">
-        <span className="size-2 rounded-full bg-gain" />Waiting for your USDT
+      <span className="flex items-center gap-2 self-center text-xs text-ink-muted">
+        <span className="size-2 rounded-full bg-green" />{t.deposit.waiting}
       </span>
+      <Caption>{t.deposit.by}</Caption>
     </>
   );
 }
 
-export function BuySheet() {
+export function WithdrawScreen() {
+  const t = useT();
   return (
     <>
-      <div className="absolute inset-0 bg-ink/30" />
-      <div className="absolute inset-x-1.5 bottom-1.5 flex flex-col gap-3 rounded-[34px] bg-card px-4 pt-2.5 pb-4">
-        <span className="h-1 w-9 self-center rounded-full bg-line" />
-        <div className="flex items-center gap-2.5">
-          <AssetIcon asset={SPACEX} size={28} />
-          <span className="text-[15px] font-semibold">Buy SpaceX</span>
-        </div>
-        <Money value={50} className="text-[32px] leading-[1.1]" />
-        <Rows rows={[["Price", "$152.40"], ["Estimated shares", "0.328"], ["Most you'll pay per share", "$153.92"], ["Fee", "[FEE]"], ["Network fee", "Free"]]} />
-        <Pill dark>Confirm</Pill>
-      </div>
-    </>
-  );
-}
-
-export function InvestScreen({ sheet = false }: { sheet?: boolean }) {
-  return (
-    <>
-      <div className="flex items-center justify-between">
-        <span className="text-xl font-semibold tracking-[-0.03em]">Invest</span>
-        <span className="flex size-8 items-center justify-center rounded-full bg-card"><Icon name="search" size={14} /></span>
-      </div>
-      <div className="flex gap-1.5 text-[11.5px] font-medium">
-        {["All", "Stocks", "Crypto", "Portfolios"].map((chip, i) => (
-          <span key={chip} className={`rounded-full px-[11px] py-[5px] ${i === 0 ? "bg-ink text-on-ink" : "bg-card"}`}>{chip}</span>
-        ))}
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-[13px] font-semibold">Ready-made</span>
-        <span className="flex items-center gap-1.5 text-[10.5px] text-ink-muted"><span className="size-1.5 rounded-full bg-gain" />US market open</span>
-      </div>
-      <div className="flex gap-2 overflow-hidden">
-        {readyMade.map((r, i) => (
-          <div key={r.name} className="flex w-[112px] shrink-0 flex-col gap-1 rounded-row bg-card p-2.5">
-            <span className="text-xs leading-tight font-semibold">{r.name}</span>
-            <span className="text-[10px] text-ink-muted">{r.sub}</span>
-            <Spark path={SPARKS[i]} up={r.change >= 0} />
-            <Change value={r.change} className="text-[10.5px] font-medium" />
-          </div>
-        ))}
-      </div>
-      <span className="text-[13px] font-semibold">Popular</span>
-      <Card className="px-3 py-0.5">
-        {popular.map((asset) => <AssetRow key={asset.ticker} asset={asset} />)}
-      </Card>
-      <TabBar active="Invest" />
-      {sheet && <BuySheet />}
-    </>
-  );
-}
-
-const CHART = "M0 118 L14 112 L28 115 L42 104 L56 108 L70 96 L84 99 L98 86 L106 112 L114 90 L128 80 L142 84 L156 70 L170 72 L184 58 L198 61 L212 44 L226 47 L240 30 L252 26 L260 18";
-
-export function StockScreen({ sheet = false }: { sheet?: boolean }) {
-  return (
-    <>
-      <div className="flex items-center justify-between">
-        <span className="flex size-8 items-center justify-center rounded-full bg-card"><Icon name="back" size={15} stroke={2.2} /></span>
-        <span className="flex size-8 items-center justify-center rounded-full bg-card"><Icon name="star" size={15} stroke={1.8} /></span>
-      </div>
-      <div className="flex flex-col gap-0.5 px-0.5">
-        <span className="flex items-center gap-1.5"><AssetIcon asset={SPACEX} size={22} /><span className="text-sm font-semibold">SpaceX</span></span>
-        <Money value={152.4} className="text-[34px] leading-[1.15]" />
-        <span className="flex items-center gap-1 text-[11.5px] font-medium text-gain tabular-nums">
-          <Icon name="rise" size={11} stroke={2.6} />$3.12 (2.1%) <span className="font-normal text-ink-muted">today</span>
-        </span>
-      </div>
-      <svg viewBox="0 0 260 140" width="100%" height="140" aria-hidden className="block shrink-0">
-        <defs>
-          <linearGradient id="spacex-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#15803d" stopOpacity="0.18" />
-            <stop offset="1" stopColor="#15803d" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={`${CHART} L260 140 L0 140 Z`} fill="url(#spacex-fill)" />
-        <path d={CHART} fill="none" stroke="#15803d" strokeWidth="1.8" strokeLinejoin="round" />
-      </svg>
-      <div className="flex justify-between text-[10.5px] font-medium text-ink-muted">
-        {["1D", "1W", "1M", "3M", "1Y", "All"].map((r) => (
-          <span key={r} className={`rounded-full px-[7px] py-1 ${r === "1M" ? "bg-card text-ink" : ""}`}>{r}</span>
-        ))}
-      </div>
-      <Card className="gap-2 p-3">
-        <span className="text-[12.5px] font-semibold">Your position</span>
-        <div className="grid grid-cols-2 gap-2 tabular-nums">
-          <span className="flex flex-col leading-snug">
-            <span className="text-[10.5px] text-ink-muted">Value</span>
-            <span className="text-[15px] font-semibold">$236.40</span>
-            <span className="text-[10.5px] text-ink-muted">1.55 shares</span>
-          </span>
-          <span className="flex flex-col leading-snug">
-            <span className="text-[10.5px] text-ink-muted">Return</span>
-            <span className="text-[15px] font-semibold text-gain">+$12.10</span>
-            <span className="text-[10.5px] text-gain">+5.4%</span>
-          </span>
-        </div>
-      </Card>
-      <div className="mt-auto flex gap-2">
-        <Pill dark className="flex-1">Buy</Pill>
-        <Pill className="flex-1">Sell</Pill>
-      </div>
-      {sheet && <BuySheet />}
-    </>
-  );
-}
-
-export function CashOutScreen() {
-  return (
-    <>
-      <Header title="Withdraw" />
-      <div className="flex flex-col px-0.5 py-1">
-        <Money value={100} className="text-[34px] leading-[1.1]" />
-        <span className="text-xs text-ink-muted tabular-nums">From cash · {usd(cash)} available</span>
-      </div>
-      <Field label="To">
-        <Selector icon={<TokenIcon token="/logos/usdt.png" chain="/logos/tron.png" size={28} />} label="USDT on Tron" />
-      </Field>
-      <div className="flex items-center justify-between gap-2 rounded-[18px] bg-card px-3.5 py-3">
-        <span className="flex min-w-0 flex-col leading-snug">
-          <span className="text-[11px] text-ink-muted">Your Tron address</span>
-          <span className="font-mono text-[13px] font-medium">TXa9…3fQe</span>
-        </span>
-        <span className="rounded-full bg-surface-app px-3 py-1.5 text-xs font-semibold">Change</span>
-      </div>
-      <Card className="px-3.5 py-0.5">
-        <Rows rows={[["You get about", "99.20 USDT"], ["Fees", "$0.80"]]} />
-      </Card>
-      <Pill dark className="mt-auto">Withdraw $100</Pill>
-    </>
-  );
-}
-
-export function CashOutDoneScreen() {
-  const steps = [
-    { label: "Sent from Mofi", state: "done" },
-    { label: "Moving to Tron", state: "now" },
-    { label: "In your wallet", state: "next" },
-  ];
-  return (
-    <>
-      <span className="mt-10 flex size-16 items-center justify-center self-center rounded-full bg-gain-soft text-gain"><Icon name="check" size={30} stroke={2.4} /></span>
-      <span className="self-center text-[22px] font-semibold tracking-[-0.02em]">On its way</span>
-      <span className="max-w-[220px] self-center text-center text-[12.5px] text-ink-muted">99.20 USDT to TXa9…3fQe on Tron. It usually arrives within minutes.</span>
-      <Card className="px-3.5 py-1 text-[12.5px]">
-        {steps.map((s) => (
-          <div key={s.label} className="flex items-center gap-2.5 border-b border-divider py-2.5 last:border-0">
-            {s.state === "done" && <span className="flex size-5 items-center justify-center rounded-full bg-gain text-white"><Icon name="check" size={12} stroke={3} /></span>}
-            {s.state === "now" && <span className="flex size-5 items-center justify-center rounded-full border-2 border-gain"><span className="size-2 rounded-full bg-gain" /></span>}
-            {s.state === "next" && <span className="size-5 rounded-full border-2 border-line" />}
-            <span className={s.state === "next" ? "text-ink-muted" : "font-semibold"}>{s.label}</span>
-          </div>
-        ))}
-      </Card>
-      <Pill className="mt-auto">Done</Pill>
-    </>
-  );
-}
-
-export function GiftSendScreen() {
-  return (
-    <>
-      <Header title="Gift a stock" />
-      <Selector icon={<AssetIcon asset={SPACEX} size={28} />} label="SpaceX" />
-      <Money value={10} className="px-0.5 py-1 text-[34px] leading-[1.1]" />
-      <Card className="px-3.5 py-0.5">
-        <div className="flex flex-col gap-0.5 border-b border-divider py-2.5">
-          <span className="text-[11px] text-ink-muted">To</span>
-          <span className="text-[13px] font-semibold">dimas@mail.com</span>
-        </div>
-        <div className="flex flex-col gap-0.5 py-2.5">
-          <span className="text-[11px] text-ink-muted">Message</span>
-          <span className="text-[13px] font-semibold">Happy birthday, Dimas!</span>
-        </div>
-      </Card>
-      <span className="px-0.5 text-[11.5px] text-ink-muted">Dimas signs in with this email to open it.</span>
-      <Pill dark className="mt-auto">Send gift</Pill>
-    </>
-  );
-}
-
-export function GiftCard({ large = false }: { large?: boolean }) {
-  return (
-    <div className={`flex flex-col gap-3.5 bg-ink text-white ${large ? "rounded-[22px] rounded-bl-md p-5" : "rounded-[22px] p-[18px]"}`}>
-      <div className="flex items-center gap-3">
-        <span className={`flex shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-monogram font-semibold ${large ? "size-[46px] text-[11px]" : "size-[42px] text-[10px]"}`}>SPCX</span>
-        <span className="flex flex-col leading-tight">
-          <span className="text-xs text-zinc-400">A gift from Rina</span>
-          <span className={`font-semibold tracking-[-0.03em] ${large ? "text-2xl" : "text-[22px]"}`}>$10 of SpaceX</span>
-        </span>
-      </div>
-      {large ? (
-        <span className="rounded-full bg-white py-[11px] text-center text-sm font-semibold text-ink">Open your gift</span>
-      ) : (
-        <span className="text-[13px] text-zinc-200">“Happy birthday, Dimas!”</span>
-      )}
-    </div>
-  );
-}
-
-export function GiftOpenScreen() {
-  return (
-    <>
-      <span className="mt-2 self-center"><Wordmark width={58} /></span>
-      <GiftCard />
-      <span className="self-center text-[13px] font-semibold">Sign in to open your gift</span>
-      <span className="flex items-center gap-2 rounded-full bg-card px-3.5 py-[11px] text-[13px]">
-        <Icon name="mail" size={15} stroke={1.8} className="text-ink-muted" />dimas@mail.com
+      <Header title={t.withdraw.title} />
+      <span className="flex items-center gap-2 rounded-full bg-card py-1.5 pr-3 pl-1.5">
+        <Image src="/logos/bnb.png" alt="" width={26} height={26} className="rounded-full" />
+        <span className="flex-1 text-[13px] font-semibold">BNB Chain</span>
+        <Icon name="down" size={14} stroke={2.2} className="text-ink-muted" />
       </span>
-      <Pill dark className="mt-auto">Open your gift</Pill>
-    </>
-  );
-}
-
-export function BorrowScreen() {
-  return (
-    <>
-      <Header title="Borrow" />
-      <div className="flex items-center gap-2.5 rounded-[18px] bg-card p-3">
-        <AssetIcon asset={{ ticker: "SPY", logo: "/logos/stocks/spy.png" }} />
+      <div className="flex gap-1.5 text-xs font-semibold">
+        {[["USDT", "/logos/usdt.png"], ["USDC", "/logos/usdc.png"], ["BNB", "/logos/bnb.png"]].map(([symbol, logo], i) => (
+          <span key={symbol} className={`flex items-center gap-1 rounded-full py-1 pr-2.5 pl-1 ${i === 0 ? "bg-ink text-on-ink" : "bg-card"}`}>
+            <Image src={logo} alt="" width={18} height={18} className="rounded-full" />{symbol}
+          </span>
+        ))}
+      </div>
+      <Card className="gap-0.5 px-3.5 py-2">
+        <span className="text-[10.5px] text-ink-muted">{t.withdraw.amount}</span>
+        <span className="flex items-baseline justify-between">
+          <span className="text-[24px] leading-tight font-semibold tracking-[-0.03em]">$100</span>
+          <span className="text-[10.5px] text-ink-muted tabular-nums">{t.withdraw.cash(usd(cash))}</span>
+        </span>
+      </Card>
+      <Card className="gap-0.5 px-3.5 py-2">
+        <span className="text-[10.5px] text-ink-muted">{t.common.yourAddress("BNB Chain")}</span>
+        <span className="font-mono text-xs">0x7a3f…91c2</span>
+      </Card>
+      <span className="flex items-center gap-3 rounded-[16px] bg-card px-3.5 py-2">
         <span className="flex flex-1 flex-col leading-tight">
-          <span className="text-[11px] text-ink-muted">Using</span>
-          <span className="text-[13px] font-semibold">S&amp;P 500</span>
+          <span className="text-[13px] font-semibold">{t.withdraw.private}</span>
+          <span className="text-[10.5px] text-ink-muted">{t.withdraw.privateHint}</span>
         </span>
-        <span className="text-[13px] font-semibold tabular-nums">$642.10</span>
-      </div>
-      <div className="flex flex-col px-0.5 py-1">
-        <span className="text-xs text-ink-muted">You get</span>
-        <Money value={200} className="text-[34px] leading-[1.1]" />
-      </div>
-      <div className="flex flex-col gap-2 px-0.5">
-        <div className="h-2 overflow-hidden rounded-full bg-line"><div className="h-2 w-[31%] rounded-full bg-gain" /></div>
-        <span className="flex items-center justify-between gap-2 text-xs text-ink-muted">
-          31% of your stocks&apos; value
-          <span className="rounded-full bg-gain-soft px-2 py-0.5 font-semibold text-gain">Safe</span>
-        </span>
-      </div>
+        <span className="flex h-5 w-8 shrink-0 items-center justify-end rounded-full bg-ink p-0.5"><span className="size-4 rounded-full bg-white" /></span>
+      </span>
       <Card className="px-3.5 py-0.5">
-        <Rows rows={[["Rate", "[RATE] a year"], ["Pay back", "Any time"]]} />
+        <Rows rows={[[t.withdraw.youGet, "100.00 USDT"], [t.withdraw.fees, "+$0.47"], [t.withdraw.taken, "$100.47"]]} />
       </Card>
-      <Pill dark className="mt-auto">Borrow $200</Pill>
+      <Pill dark>{t.withdraw.submit("$100.47", true)}</Pill>
     </>
   );
 }
 
-function FeedItem({ letter, children, time }: { letter: string; children: ReactNode; time: string }) {
+export function WithdrawDoneScreen() {
+  const t = useT();
+  const steps = t.withdraw.steps("BNB Chain");
+  const state = ["done", "now", "next"];
   return (
-    <div className="flex items-center gap-2.5 rounded-row bg-card px-3 py-[11px]">
-      <Avatar letter={letter} />
-      <span className="min-w-0 flex-1 text-[13px]">{children}</span>
-      <span className="text-[10.5px] text-ink-muted">{time}</span>
+    <>
+      <Done icon="check" className="mt-8" />
+      <span className="self-center text-[22px] font-semibold tracking-[-0.02em]">{t.withdraw.onItsWay}</span>
+      <span className="max-w-[230px] self-center text-center text-[12.5px] text-ink-muted">{t.withdraw.onItsWayText("100.00 USDT", "0x7a3f…91c2", "BNB Chain")}</span>
+      <Card className="px-3.5 py-1 text-[12.5px]">
+        {steps.map((label, i) => (
+          <div key={label} className="flex items-center gap-2.5 border-b border-divider py-2.5 last:border-0">
+            {state[i] === "done" && <span className="flex size-5 items-center justify-center rounded-full bg-gain text-white"><Icon name="check" size={12} stroke={3} /></span>}
+            {state[i] === "now" && <span className="flex size-5 items-center justify-center rounded-full border-2 border-gain"><span className="size-2 rounded-full bg-gain" /></span>}
+            {state[i] === "next" && <span className="size-5 rounded-full border-2 border-line" />}
+            <span className={state[i] === "next" ? "text-ink-muted" : "font-semibold"}>{label}</span>
+          </div>
+        ))}
+      </Card>
+      <Pill className="mt-auto">{t.common.done}</Pill>
+    </>
+  );
+}
+
+export function GiftScreen() {
+  const t = useT();
+  return (
+    <AmountSheet title={t.gift.title("SpaceX")} amount={10}>
+      <span className="rounded-[16px] bg-card px-3 py-2 text-[11.5px] text-ink-muted">{t.gift.howTo}</span>
+      <Pill dark className="order-last">{t.gift.submit("$10.00", "SpaceX")}</Pill>
+    </AmountSheet>
+  );
+}
+
+export function GiftClaimScreen() {
+  const t = useT();
+  return (
+    <>
+      <span className="mt-3 self-center"><Wordmark width={58} /></span>
+      <Done icon="gift" className="mt-6" />
+      <div className="flex flex-col items-center gap-0.5 text-center">
+        <span className="text-[22px] font-semibold tracking-[-0.03em]">{t.claim.gotGift}</span>
+        <span className="text-[12.5px] text-ink-muted">{t.claim.toInvest("$10.00")}</span>
+      </div>
+      <Card className="px-3 py-0.5"><AssetRow asset={{ ...spacex, value: 10 }} /></Card>
+      <Pill dark className="mt-auto">{t.claim.signIn}</Pill>
+    </>
+  );
+}
+
+// A gift link as it shows up in a chat.
+export function GiftLink() {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-3 rounded-[22px] rounded-bl-md bg-ink p-5 text-white">
+      <div className="flex items-center gap-3">
+        <span className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-monogram"><Icon name="gift" size={22} stroke={1.9} /></span>
+        <span className="flex flex-col leading-tight">
+          <span className="text-xs text-zinc-400">{t.landing.giftFrom}</span>
+          <span className="text-2xl font-semibold tracking-[-0.03em]">{t.landing.giftAmount}</span>
+        </span>
+      </div>
+      <span className="truncate text-[13px] text-zinc-400 underline">getmofi.com/app/gift#7Hq2…</span>
     </div>
   );
 }
 
-export function FriendsScreen() {
-  const league = [["Rina", 6.2, true], ["Dimas", 4.8, false], ["Sari", 3.1, false]] as const;
+export function EarnScreen() {
+  const t = useT();
   return (
     <>
-      <div className="flex items-center justify-between">
-        <span className="text-xl font-semibold tracking-[-0.03em]">Friends</span>
-        <span className="rounded-full bg-ink px-3.5 py-[7px] text-xs font-semibold text-on-ink">Invite</span>
+      <Header title={t.earn.title} />
+      <div className="flex flex-col px-0.5">
+        <span className="text-[11px] text-ink-muted">{t.earn.earning}</span>
+        <Money value={earning} className="text-[38px] leading-[1.1]" />
+        <span className="text-[11.5px] font-medium text-gain">{t.landing.everySecond}</span>
       </div>
-      <Card className="px-3 py-2.5">
-        <div className="flex items-center justify-between pb-1">
-          <span className="text-[13px] font-semibold">October league</span>
-          <span className="text-[10.5px] text-ink-muted">Friends only</span>
-        </div>
-        {league.map(([name, change, you], i) => (
-          <div key={name} className="flex items-center gap-2.5 py-1.5 tabular-nums">
-            <span className="w-2.5 text-[11px] text-ink-muted">{i + 1}</span>
-            <Avatar letter={name[0]} size={28} />
-            <span className="flex-1 text-[13px] font-semibold">{name} {you && <span className="font-normal text-ink-muted">(you)</span>}</span>
-            <Change value={change} className="text-[13px] font-semibold" />
-          </div>
-        ))}
+      <div className="flex gap-2">
+        <Pill dark className="flex-1">{t.earn.moveIn}</Pill>
+        <Pill className="flex-1">{t.earn.moveOut}</Pill>
+      </div>
+      <span className="flex items-center gap-2.5 rounded-[16px] bg-card px-3 py-2.5 text-[13px] font-semibold tabular-nums">
+        <span className="flex size-6 items-center justify-center rounded-full bg-gain-soft text-[11px] text-gain">$</span>
+        <span className="flex-1">{t.earn.notEarning}</span>{usd(cash)}
+      </span>
+      <Card className="gap-1 px-3.5 py-3">
+        <span className="text-[13px] font-semibold">{t.earn.how}</span>
+        <span className="text-xs leading-snug text-ink-muted">{t.earn.howText}</span>
       </Card>
-      <span className="px-0.5 text-[13px] font-semibold">Feed</span>
-      <FeedItem letter="D" time="2h"><b className="font-semibold">Dimas</b> bought SpaceX</FeedItem>
-      <Card className="gap-2 px-3 py-[11px]">
-        <div className="flex items-center gap-2.5">
-          <Avatar letter="A" />
-          <span className="min-w-0 flex-1 text-[13px]"><b className="font-semibold">Arif</b> shared a portfolio</span>
-          <span className="text-[10.5px] text-ink-muted">4h</span>
-        </div>
-        <div className="grid grid-cols-[12fr_5fr_3fr] gap-0.5">
-          <div className="h-1.5 rounded-l-full bg-ink" />
-          <div className="h-1.5 bg-zinc-500" />
-          <div className="h-1.5 rounded-r-full bg-zinc-300" />
-        </div>
-        <span className="text-[11px] text-ink-muted tabular-nums">S&amp;P 500 60% · Bitcoin 25% · NVIDIA 15%</span>
-        <Pill dark className="py-2 text-[12.5px]">Copy</Pill>
-      </Card>
-      <FeedItem letter="S" time="5h"><b className="font-semibold">Sari</b> copied your Big Tech mix</FeedItem>
-      <TabBar active="Friends" />
+      <Caption>{t.earn.by}</Caption>
     </>
   );
 }

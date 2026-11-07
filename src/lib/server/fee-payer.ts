@@ -66,17 +66,16 @@ export async function payTreasury(owner: TransactionSigner, fee: bigint, payer: 
   ];
 }
 
-// A USDC transfer from the user to an Aurora deposit address, plus Mofi's network fee to the treasury.
-// The fee wallet pays the Solana fee and opens the deposit address's USDC account.
+// A USDC transfer from the user to an Aurora deposit address. The fee wallet pays the Solana fee and opens the
+// deposit address's USDC account.
 // The server only builds these for addresses Aurora just gave it.
-export async function payUsdc(from: string, to: string, amount: bigint, fee: bigint) {
+export async function payUsdc(from: string, to: string, amount: bigint) {
   const payer = await feeSigner();
   const owner = createNoopSigner(address(from));
   const mint = address(USDC_MINT);
-  const [source, destination, toTreasury, { value: latest }] = await Promise.all([
+  const [source, destination, { value: latest }] = await Promise.all([
     usdcAccount(from),
     usdcAccount(to),
-    payTreasury(owner, fee, payer),
     rpc<{ value: { blockhash: string; lastValidBlockHeight: number } }>("getLatestBlockhash", [{ commitment: "confirmed" }]),
   ]);
   const message = pipe(
@@ -90,7 +89,6 @@ export async function payUsdc(from: string, to: string, amount: bigint, fee: big
           getSetComputeUnitPriceInstruction({ microLamports: 100_000 }),
           getCreateAssociatedTokenIdempotentInstruction({ payer, ata: destination, owner: address(to), mint }),
           getTransferCheckedInstruction({ source, mint, destination, authority: owner, amount, decimals: 6 }),
-          ...toTreasury,
         ],
         m,
       ),
