@@ -67,6 +67,8 @@ const SERVER: Record<string, string> = {
   "This doesn't fit in one transaction yet. Try a smaller amount.": "Ini belum muat dalam satu transaksi. Coba jumlah yang lebih kecil.",
   "Couldn't load this right now.": "Belum bisa memuat ini.",
   "Kamino's API isn't answering.": "API Kamino sedang tidak merespons.",
+  "The network setup cost changed. Check the new total and try again.": "Biaya penyiapan jaringan berubah. Cek total terbaru lalu coba lagi.",
+  "Couldn't price the network setup right now. Try again.": "Belum bisa menghitung biaya penyiapan jaringan. Coba lagi.",
 };
 
 const PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
@@ -234,6 +236,7 @@ export const id: Messages = {
     noExtra: "Tanpa biaya tambahan",
     youGet: "Kamu terima sekitar",
     fees: "Biaya",
+    setup: "Penyiapan alamat (sekali)",
     taken: "Diambil dari saldo",
     arrives: "Tiba dalam",
     minutes: (n) => `sekitar ${n} menit`,

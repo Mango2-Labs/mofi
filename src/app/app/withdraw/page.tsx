@@ -18,9 +18,10 @@ import { usePoll } from "@/lib/use-poll";
 import { usePortfolio } from "@/lib/use-portfolio";
 import { useSwapStatus } from "@/lib/use-swap-status";
 
-type Quote = { transaction: string; depositAddress: string; amountOut: string; timeEstimate: number };
-// total is everything taken from cash for the amount typed to arrive, fees on top.
-type Price = { total: number; amountOut: number; timeEstimate: number };
+type Quote = { transaction: string; depositAddress: string; amountOut: string | null; timeEstimate: number; permanent?: boolean };
+// total is everything taken from cash for the amount typed to arrive, fees on top. setup is the one-time cost of opening
+// the destination's account, when the user pays it (see withdraw-setup.ts); it's part of total.
+type Price = { total: number; setup: number; amountOut: number; timeEstimate: number };
 // What the withdrawal comes to, with and without Private. priv is null when there's no private route.
 type Priced = { key: string; plain?: Price; priv?: Price | null; error?: string };
 
@@ -50,10 +51,10 @@ function Withdraw() {
   const [confidential, setConfidential] = useState(false);
   const [priced, setPriced] = useState<Priced | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState<{ tx: string; at: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const status = useSwapStatus(sent && quote ? quote.depositAddress : null);
+  const status = useSwapStatus(sent && quote ? quote.depositAddress : null, quote?.permanent ? sent ?? undefined : undefined);
   const cash = portfolio?.cash;
   // Dollars and the chain's own coin only; the first is picked until the user taps another.
   const onChain = (assets ?? []).filter((a) => a.chain === chain).sort(byPreference);
@@ -101,15 +102,17 @@ function Withdraw() {
   const withdraw = () =>
     run(async () => {
       if (!price) return;
-      const res = await postJson("/api/cash-out", { assetId, amount: price.total.toFixed(3), owner: address, recipient, private: confidential });
+      const res = await postJson("/api/cash-out", { assetId, amount: price.total.toFixed(3), setup: price.setup, owner: address, recipient, private: confidential });
       const data = await res.json();
       if (!res.ok) return setError(data.error);
       if (!wallet) return;
       setQuote(data);
       const { signedTransaction } = await signTransaction({ transaction: fromBase64(data.transaction), wallet, chain: "solana:mainnet" });
+      const at = Date.now();
       const sentRes = await postJson("/api/send", { transaction: toBase64(signedTransaction) });
-      if (sentRes.ok) setSent(true);
-      else setError((await sentRes.json()).error);
+      const result = await sentRes.json();
+      if (sentRes.ok) setSent({ tx: result.signature, at });
+      else setError(result.error);
     });
 
   const [sentLabel, movingLabel, walletLabel] = t.withdraw.steps(chainName(chain));
@@ -120,7 +123,8 @@ function Withdraw() {
   ] as const;
   const rows: [string, string][] = [
     [t.withdraw.youGet, price && to ? `${amountOf(price.amountOut)} ${to.symbol}` : "…"],
-    [t.withdraw.fees, price ? `+${exact(price.total - dollars)}` : "…"],
+    [t.withdraw.fees, price ? `+${exact(price.total - dollars - price.setup)}` : "…"],
+    ...(price?.setup ? [[t.withdraw.setup, `+${exact(price.setup)}`] as [string, string]] : []),
     [t.withdraw.taken, price ? exact(price.total) : "…"],
     [t.withdraw.arrives, price ? t.withdraw.minutes(Math.max(1, Math.round(price.timeEstimate / 60))) : "…"],
   ];
@@ -206,7 +210,7 @@ function Withdraw() {
           <span className="max-w-[260px] self-center text-center text-sm text-ink-muted" aria-live="polite">
             {status === "REFUNDED" || status === "FAILED"
               ? t.withdraw.sentBackText
-              : t.withdraw.onItsWayText(`${amountOf(quote.amountOut)} ${to.symbol}`, short(recipient.trim()), chainName(chain))}
+              : t.withdraw.onItsWayText(quote.amountOut ? `${amountOf(quote.amountOut)} ${to.symbol}` : to.symbol, short(recipient.trim()), chainName(chain))}
           </span>
           {status !== "REFUNDED" && status !== "FAILED" && (
             <Card className="px-4 py-1 text-sm">
