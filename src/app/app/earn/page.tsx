@@ -11,6 +11,7 @@ import { Sheet } from "@/components/sheet";
 import { SignedIn, useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
 import { fromBase64, toBase64 } from "@/lib/base64";
+import { Approx, useMoney } from "@/components/currency";
 import { splitCents, usd } from "@/lib/format";
 import { usePoll } from "@/lib/use-poll";
 import { usePortfolio } from "@/lib/use-portfolio";
@@ -31,6 +32,7 @@ function Earn() {
   const { portfolio } = usePortfolio(address);
   const apy = usePoll<{ apy: number }>("/api/earn", 300_000).data?.apy;
   const t = useT();
+  const m = useMoney();
   const [moving, setMoving] = useState<Direction | null>(null);
   const earn = portfolio?.earn ?? 0;
   const cash = portfolio?.cash ?? 0;
@@ -44,7 +46,7 @@ function Earn() {
 
       <div className="flex flex-col gap-0.5 px-1 pt-2">
         <span className="text-xs text-ink-muted">{t.earn.earning}</span>
-        {portfolio ? <Money value={earn} className="text-[44px] leading-[1.05]" /> : <span className="text-[44px] leading-[1.05] font-semibold text-ink-faint">$—</span>}
+        {portfolio ? <Money value={earn} className="text-[44px] leading-[1.05]" /> : <span className="text-[44px] leading-[1.05] font-semibold text-ink-faint">{m.none}</span>}
         {apy != null && <span className="text-[13px] font-medium text-gain">{t.earn.rate((apy * 100).toFixed(2))}</span>}
       </div>
 
@@ -57,7 +59,7 @@ function Earn() {
         <div className="flex items-center gap-3 py-3">
           <span className="flex size-[26px] items-center justify-center rounded-full bg-gain-soft text-xs font-semibold text-gain">$</span>
           <span className="flex-1 text-[15px] font-semibold">{t.earn.notEarning}</span>
-          <span className="text-[15px] font-semibold tabular-nums">{usd(cash)}</span>
+          <span className="text-[15px] font-semibold tabular-nums">{m.money(cash)}</span>
         </div>
       </Card>
 
@@ -122,6 +124,7 @@ function MoveSheet({ owner, direction, available, onClose }: { owner: string; di
             <span className={`text-[64px] leading-none font-semibold tracking-[-0.05em] tabular-nums ${amount ? "" : "text-ink-faint"}`}>
               {whole}{amount.includes(".") && <span className="text-ink-faint">{cents}</span>}
             </span>
+            <Approx dollars={dollars} className="text-sm" />
           </div>
           <Card className="px-3.5 py-0.5">
             <div className="flex items-center gap-3 py-3">

@@ -5,7 +5,8 @@ import { useT } from "@/components/language";
 import { AssetRow, Card, Icon, Money } from "@/components/phone";
 import { SignedIn, useMofiWallet } from "@/components/signed-in";
 import { KINDS, assetByMint } from "@/lib/assets";
-import { pct, usd } from "@/lib/format";
+import { useMoney } from "@/components/currency";
+import { pct } from "@/lib/format";
 import { usePortfolio } from "@/lib/use-portfolio";
 
 export default function PortfolioPage() {
@@ -21,6 +22,7 @@ function Portfolio() {
   const { address } = useMofiWallet();
   const { portfolio, error } = usePortfolio(address);
   const t = useT();
+  const m = useMoney();
 
   const holdings = portfolio?.holdings ?? [];
   // Today's move in dollars, from each holding's 24-hour change.
@@ -35,10 +37,10 @@ function Portfolio() {
 
       <div className="flex flex-col gap-0.5 px-1 pt-2">
         <span className="text-xs text-ink-muted">{t.portfolio.total}</span>
-        {portfolio ? <Money value={portfolio.total} className="text-[44px] leading-[1.05]" /> : <span className="text-[44px] leading-[1.05] font-semibold text-ink-faint">$—</span>}
+        {portfolio ? <Money value={portfolio.total} className="text-[44px] leading-[1.05]" /> : <span className="text-[44px] leading-[1.05] font-semibold text-ink-faint">{m.none}</span>}
         {invested > 0 && (
           <span className={`text-[13px] font-medium tabular-nums ${today < 0 ? "text-loss" : "text-gain"}`}>
-            {today < 0 ? "−" : "+"}{usd(Math.abs(today))} ({pct(invested - today > 0 ? (today / (invested - today)) * 100 : 0)}) <span className="font-normal text-ink-muted">{t.common.today}</span>
+            {today < 0 ? "−" : "+"}{m.money(Math.abs(today))} ({pct(invested - today > 0 ? (today / (invested - today)) * 100 : 0)}) <span className="font-normal text-ink-muted">{t.common.today}</span>
           </span>
         )}
         {error && <span className="text-xs text-loss">{t.serverError(error)}</span>}
@@ -57,7 +59,7 @@ function Portfolio() {
               <section key={g.kind} className="flex flex-col gap-2">
                 <h2 className="flex justify-between px-1 pt-2 text-[15px] font-semibold">
                   {t.kinds[g.kind]}
-                  <span className="tabular-nums">{usd(g.items.reduce((s, h) => s + h.value, 0))}</span>
+                  <span className="tabular-nums">{m.money(g.items.reduce((s, h) => s + h.value, 0))}</span>
                 </h2>
                 <Card className="px-3.5 py-0.5">
                   {g.items.map((h) => (
@@ -71,20 +73,20 @@ function Portfolio() {
             <section className="flex flex-col gap-2">
               <h2 className="flex justify-between px-1 pt-2 text-[15px] font-semibold">
                 {t.portfolio.cash}
-                <span className="tabular-nums">{usd(portfolio.cash + portfolio.earn)}</span>
+                <span className="tabular-nums">{m.money(portfolio.cash + portfolio.earn)}</span>
               </h2>
               <Card className="px-3.5 py-0.5">
                 {portfolio.earn >= 0.01 && (
                   <Link href="/app/earn" className="flex items-center gap-3 border-b border-divider py-3">
                     <span className="flex size-[26px] items-center justify-center rounded-full bg-gain-soft text-gain"><Icon name="rise" size={14} stroke={2.2} /></span>
                     <span className="flex-1 text-[15px] font-semibold">{t.portfolio.earning}</span>
-                    <span className="text-[15px] font-semibold tabular-nums">{usd(portfolio.earn)}</span>
+                    <span className="text-[15px] font-semibold tabular-nums">{m.money(portfolio.earn)}</span>
                   </Link>
                 )}
                 <div className="flex items-center gap-3 py-3">
                   <span className="flex size-[26px] items-center justify-center rounded-full bg-gain-soft text-xs font-semibold text-gain">$</span>
                   <span className="flex-1 text-[15px] font-semibold">{t.portfolio.ready}</span>
-                  <span className="text-[15px] font-semibold tabular-nums">{usd(portfolio.cash)}</span>
+                  <span className="text-[15px] font-semibold tabular-nums">{m.money(portfolio.cash)}</span>
                 </div>
               </Card>
             </section>

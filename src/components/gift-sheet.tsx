@@ -3,6 +3,7 @@
 import { useSignTransaction } from "@privy-io/react-auth/solana";
 import { useState } from "react";
 import { Keypad } from "@/components/keypad";
+import { Approx } from "@/components/currency";
 import { useT } from "@/components/language";
 import { AssetIcon, Card, Icon } from "@/components/phone";
 import { Sheet } from "@/components/sheet";
@@ -104,6 +105,7 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
             <span className={`text-[64px] leading-none font-semibold tracking-[-0.05em] tabular-nums ${amount ? "" : "text-ink-faint"}`}>
               {whole}{amount.includes(".") && <span className="text-ink-faint">{cents}</span>}
             </span>
+            <Approx dollars={dollars} className="text-sm" />
             <span className="text-sm text-ink-muted tabular-nums">{price && dollars ? t.trade.about(units(asset, (dollars - fee) / price, t.common.shares)) : t.gift.fromCash(cashShown)}</span>
           </div>
           {dollars > 0 && (

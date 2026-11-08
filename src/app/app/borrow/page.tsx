@@ -11,6 +11,7 @@ import { SignedIn, useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
 import { ASSETS } from "@/lib/assets";
 import { fromBase64, toBase64 } from "@/lib/base64";
+import { Approx } from "@/components/currency";
 import { usd } from "@/lib/format";
 import type { BorrowOption, Loan } from "@/lib/server/kamino";
 import { usePoll } from "@/lib/use-poll";
@@ -130,7 +131,7 @@ function Borrow() {
               <div className="flex items-start justify-between">
                 <span className="flex flex-col">
                   <span className="text-xs text-ink-muted">{t.borrow.youOwe}</span>
-                  <Money value={loan.debt} className="text-[28px] leading-[1.15]" />
+                  <Money value={loan.debt} dollars className="text-[28px] leading-[1.15]" />
                 </span>
                 <span className={`rounded-full bg-surface-app px-3 py-1 text-xs font-semibold ${HEALTH_COLOR[loan.health]}`}>{t.borrow.health[loan.health] ?? loan.health}</span>
               </div>
@@ -212,7 +213,8 @@ function Borrow() {
         <>
           <Card className="gap-1 p-4">
             <span className="text-xs text-ink-muted">{t.borrow.youBorrow}</span>
-            <Money value={dollars} className="text-[32px] leading-[1.1]" />
+            <Money value={dollars} dollars className="text-[32px] leading-[1.1]" />
+            <Approx dollars={dollars} className="text-sm" />
             <dl className="mt-2 flex flex-col text-sm tabular-nums">
               {[
                 [t.borrow.youLock, `${option.name} · ${usd(quote.locked)}`],

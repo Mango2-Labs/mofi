@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { DepositFlow } from "@/components/deposit-flow";
 import { Keypad } from "@/components/keypad";
+import { Approx } from "@/components/currency";
 import { useT } from "@/components/language";
 import { usePendingBuy } from "@/components/pending-buy";
 import { AssetIcon, Card, Icon } from "@/components/phone";
@@ -111,6 +112,7 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
             <span className={`text-[64px] leading-none font-semibold tracking-[-0.05em] tabular-nums ${amount ? "" : "text-ink-faint"}`}>
               {whole}{amount.includes(".") && <span className="text-ink-faint">{cents}</span>}
             </span>
+            <Approx dollars={dollars} className="text-sm" />
             <span className="text-sm text-ink-muted tabular-nums">{price && dollars ? t.trade.about(units(asset, (side === "buy" ? dollars - fee : dollars) / price, t.common.shares)) : t.trade.at(price ? priceUsd(price) : "—")}</span>
           </div>
           <Card className="px-3.5 py-0.5">
