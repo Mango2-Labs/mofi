@@ -111,7 +111,6 @@ function MoveSheet({ owner, direction, available, onClose }: { owner: string; di
           <span className="mt-4 flex size-16 items-center justify-center self-center rounded-full bg-gain-soft text-gain"><Icon name="check" size={30} stroke={2.4} /></span>
           <h2 className="text-center text-2xl font-semibold tracking-[-0.03em]">{t.earn.moved(usd(dollars), into)}</h2>
           <button type="button" onClick={onClose} className="cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">{t.common.done}</button>
-          <a href={`https://solscan.io/tx/${done}`} target="_blank" rel="noreferrer" className="self-center text-sm text-ink-muted underline">{t.common.solscan}</a>
         </>
       ) : (
         <>

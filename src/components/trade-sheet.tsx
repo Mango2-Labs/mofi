@@ -23,7 +23,7 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
   const { pending, result, start, cancel, setShown } = usePendingBuy();
   const [amount, setAmount] = useState("");
   const [depositing, setDepositing] = useState(false);
-  const [done, setDone] = useState<{ spent: number; signature: string } | null>(null);
+  const [done, setDone] = useState<{ spent: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -34,10 +34,12 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
   const short = side === "buy" && dollars > cash ? Math.ceil((dollars - cash) * 1.01 * 100) / 100 : 0;
   const tooMuch = side === "sell" && dollars > holding + 0.005;
   const landed = depositing && result?.status === "done" && result.symbol === asset.symbol ? result : null;
-  const finished = done ?? (landed && { spent: landed.spent, signature: landed.signature });
+  const finished = done ?? (landed && { spent: landed.spent });
   const [whole, cents] = splitCents(dollars);
   // Mofi's fee comes out of what's bought (or out of the cash a sale brings in).
   const fee = tradeFee(dollars);
+  // Under $1 can still be sold when it's everything held, so a small position is never stuck.
+  const min = side === "buy" ? MIN : Math.max(0.01, Math.min(MIN, Math.floor(holding * 100) / 100));
 
   // While this sheet shows the deposit's progress, the app-wide toast stays out of the way.
   useEffect(() => {
@@ -50,7 +52,8 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
     setBusy(true);
     setError(null);
     try {
-      setDone({ spent: dollars, signature: await trade.execute(await trade.order(side, asset.symbol, dollars.toFixed(2))) });
+      await trade.execute(await trade.order(side, asset.symbol, dollars.toFixed(2)));
+      setDone({ spent: dollars });
     } catch (e) {
       setError(e instanceof TradeError ? e.message : t.common.failed);
     } finally {
@@ -74,7 +77,6 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
             </p>
           </div>
           <button type="button" onClick={onClose} className="h-13 cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">{t.common.done}</button>
-          <a href={`https://solscan.io/tx/${finished.signature}`} target="_blank" rel="noreferrer" className="self-center text-sm text-ink-muted underline">{t.common.solscan}</a>
         </>
       ) : depositing ? (
         <DepositFlow
@@ -138,7 +140,7 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
           </Card>
           <Keypad value={amount} onChange={(next) => { setAmount(next); setError(null); }} />
           {error && <p className="px-1 text-sm text-loss">{t.serverError(error)}</p>}
-          <button type="button" onClick={submit} disabled={busy || dollars < MIN || tooMuch} className="cursor-pointer rounded-full bg-ink py-4 text-base font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
+          <button type="button" onClick={submit} disabled={busy || dollars < min || tooMuch} className="cursor-pointer rounded-full bg-ink py-4 text-base font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
             {busy ? t.trade.busy(side) : short > 0 ? t.trade.depositAndBuy(usd(short)) : t.trade.submit(side, dollars ? usd(dollars) : "")}
           </button>
         </>

@@ -325,7 +325,6 @@ export function GiftScreen() {
   const t = useT();
   return (
     <AmountSheet title={t.gift.title("SpaceX")} amount={10}>
-      <span className="rounded-[16px] bg-card px-3 py-2 text-[11.5px] text-ink-muted">{t.gift.howTo}</span>
       <Pill dark className="order-last">{t.gift.submit("$10.00", "SpaceX")}</Pill>
     </AmountSheet>
   );

@@ -106,15 +106,12 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
             </span>
             <span className="text-sm text-ink-muted tabular-nums">{price && dollars ? t.trade.about(units(asset, (dollars - fee) / price, t.common.shares)) : t.gift.fromCash(cashShown)}</span>
           </div>
-          <Card className="px-4 py-0.5 text-sm">
-            {dollars > 0 && (
-              <div className="flex items-center justify-between border-b border-divider py-3">
-                <span className="text-ink-muted">{t.trade.fee(`${TRADE_FEE_BPS / 100}%`)}</span>
-                <span className="font-semibold tabular-nums">{exact(fee)}</span>
-              </div>
-            )}
-            <p className="py-3 text-ink-muted">{t.gift.howTo}</p>
-          </Card>
+          {dollars > 0 && (
+            <Card className="flex items-center justify-between px-4 py-3.5 text-sm">
+              <span className="text-ink-muted">{t.trade.fee(`${TRADE_FEE_BPS / 100}%`)}</span>
+              <span className="font-semibold tabular-nums">{exact(fee)}</span>
+            </Card>
+          )}
           <Keypad value={amount} onChange={(next) => { setAmount(next); setError(null); }} />
           {dollars > cash && <p className="px-1 text-sm text-loss">{t.gift.youHave(cashShown)}</p>}
           {error && <p className="px-1 text-sm text-loss">{t.serverError(error)}</p>}
