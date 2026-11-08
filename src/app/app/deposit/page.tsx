@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DepositFlow } from "@/components/deposit-flow";
+import { useT } from "@/components/language";
 import { Icon } from "@/components/phone";
 import { SignedIn, useMofiWallet } from "@/components/signed-in";
 import { usd } from "@/lib/format";
@@ -19,6 +20,7 @@ export default function DepositPage() {
 
 function Deposit() {
   const router = useRouter();
+  const t = useT();
   const { address } = useMofiWallet();
   const { portfolio } = usePortfolio(address);
   // Cash when the address was shown: a deposit shows up as the difference.
@@ -30,13 +32,13 @@ function Deposit() {
       {added >= 0.01 ? (
         <>
           <div className="flex items-center justify-center gap-2 text-sm font-semibold text-gain" aria-live="polite">
-            <Icon name="check" size={16} stroke={2.6} />{usd(added)} landed in your cash
+            <Icon name="check" size={16} stroke={2.6} />{t.deposit.landed(usd(added))}
           </div>
-          <Link href="/app/explore" className="rounded-full bg-ink py-3.5 text-center font-semibold text-on-ink">Find something to buy</Link>
+          <Link href="/app/explore" className="rounded-full bg-ink py-3.5 text-center font-semibold text-on-ink">{t.deposit.findSomething}</Link>
         </>
       ) : (
         <div className="flex items-center justify-center gap-2 text-sm text-ink-muted" aria-live="polite">
-          <span className="size-2 animate-pulse rounded-full bg-gain motion-reduce:animate-none" />Waiting for your deposit
+          <span className="size-2 animate-pulse rounded-full bg-gain motion-reduce:animate-none" />{t.deposit.waiting}
         </div>
       )}
     </DepositFlow>

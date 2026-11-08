@@ -1,16 +1,12 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useT } from "@/components/language";
 import { Phone } from "@/components/phone";
-import { AddMoneyScreen, FriendsScreen, HomeScreen, InvestScreen } from "@/components/screens";
+import { BuyScreen, DepositAddressScreen, ExploreScreen, PortfolioScreen, WithdrawScreen } from "@/components/screens";
 
-const SLIDES = [
-  { title: "Your money at a glance", alt: "The Home screen: total value $1,284.50, a notice that 250 USDT arrived from Tron, and holdings in the S&P 500, SpaceX, NVIDIA, Bitcoin and cash.", screen: <HomeScreen /> },
-  { title: "Deposit from any chain", alt: "The Deposit screen: 250 USDT from Tron, a deposit address with a QR code, waiting for the USDT.", screen: <AddMoneyScreen /> },
-  { title: "Stocks, funds and crypto", alt: "The Invest screen: ready-made portfolios, and popular stocks and crypto with prices.", screen: <InvestScreen /> },
-  { title: "See everything before you buy", alt: "A Buy SpaceX sheet: $50, the price, about 0.328 shares, the most you will pay per share, the fee, and Confirm.", screen: <InvestScreen sheet /> },
-  { title: "Invest with friends", alt: "The Friends screen: a monthly league and a feed of what friends buy, with a Copy button.", screen: <FriendsScreen /> },
-];
+// One screen per slide of the tour; titles and descriptions are in lib/i18n.
+const SCREENS = [<PortfolioScreen key="portfolio" />, <ExploreScreen key="explore" />, <BuyScreen key="buy" />, <DepositAddressScreen key="deposit" />, <WithdrawScreen key="withdraw" />];
 
 const STEP_MS = 4000;
 const REDUCED = "(prefers-reduced-motion: reduce)";
@@ -22,6 +18,7 @@ function subscribeReduced(onChange: () => void) {
 }
 
 export function AppTour() {
+  const t = useT();
   const [index, setIndex] = useState(0);
   const reducedMotion = useSyncExternalStore(subscribeReduced, () => window.matchMedia(REDUCED).matches, () => false);
   // Starts paused for people who ask for less motion, until they press play.
@@ -30,23 +27,23 @@ export function AppTour() {
 
   useEffect(() => {
     if (paused) return;
-    const timer = setTimeout(() => setIndex((i) => (i + 1) % SLIDES.length), STEP_MS);
+    const timer = setTimeout(() => setIndex((i) => (i + 1) % SCREENS.length), STEP_MS);
     return () => clearTimeout(timer);
   }, [index, paused]);
 
-  const slide = SLIDES[index];
+  const slide = t.landing.tour[index];
   return (
     <div className="flex w-full flex-col items-center gap-3.5">
       <div className="flex items-center gap-1">
-        {SLIDES.map((s, i) => (
-          <button key={s.title} type="button" onClick={() => setIndex(i)} aria-label={`Show ${s.title.toLowerCase()}`} aria-current={i === index} className="cursor-pointer px-[3px] py-5">
+        {t.landing.tour.map((s, i) => (
+          <button key={i} type="button" onClick={() => setIndex(i)} aria-label={t.landing.tourShow(s.title)} aria-current={i === index} className="cursor-pointer px-[3px] py-5">
             <span className={`block h-1 w-[30px] rounded-full ${i === index ? "bg-ink" : "bg-zinc-300"}`} />
           </button>
         ))}
         <button
           type="button"
           onClick={() => setPaused(!paused)}
-          aria-label={paused ? "Play the app tour" : "Pause the app tour"}
+          aria-label={paused ? t.landing.tourPlay : t.landing.tourPause}
           className="ml-2 flex size-[34px] cursor-pointer items-center justify-center rounded-full border border-line bg-card"
         >
           {paused ? (
@@ -57,8 +54,7 @@ export function AppTour() {
         </button>
       </div>
       <p className="text-center text-xl font-semibold tracking-[-0.02em]" aria-live="polite">{slide.title}</p>
-      <Phone size="lg" label={slide.alt}>{slide.screen}</Phone>
-      <span className="text-xs text-ink-muted">Example</span>
+      <Phone size="lg" label={slide.alt}>{SCREENS[index]}</Phone>
     </div>
   );
 }

@@ -15,12 +15,13 @@ function orderError(o: Order, buy: boolean, name: string) {
   return "Couldn't get a price right now. Try a different amount.";
 }
 
-// Sells are entered in dollars. Selling nearly everything sells all of it, so no dust is left behind.
+// Sells are entered in dollars. Selling nearly everything (within 0.5%, or a cent, since Max rounds down) sells all of it,
+// so no dust is left behind.
 async function sellAmount(owner: string, mint: string, dollars: number) {
   const [{ raw, ui }, quotes] = await Promise.all([balanceOf(owner, mint), prices([mint])]);
   const worth = ui * (quotes[mint]?.usdPrice ?? 0);
   if (!raw || !worth) return null;
-  if (dollars >= worth * 0.995) return raw.toString();
+  if (dollars >= Math.min(worth * 0.995, worth - 0.01)) return raw.toString();
   return ((raw * BigInt(Math.round((dollars / worth) * 1e6))) / BigInt(1e6)).toString();
 }
 

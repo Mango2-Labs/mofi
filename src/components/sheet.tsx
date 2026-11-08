@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { useT } from "@/components/language";
 
 // A bottom sheet over the current screen. Escape or a tap on the backdrop closes it.
 export function Sheet({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
+  const t = useT();
   useEffect(() => panel.current?.focus(), []);
 
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center">
-      <button type="button" aria-label="Close" tabIndex={-1} onClick={onClose} className="absolute inset-0 cursor-default bg-ink/30" />
+      <button type="button" aria-label={t.common.close} tabIndex={-1} onClick={onClose} className="absolute inset-0 cursor-default bg-ink/30" />
       <div
         ref={panel}
         role="dialog"

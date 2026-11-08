@@ -1,9 +1,8 @@
 import { ASSETS, USDC_MINT } from "@/lib/assets";
 import { EARN_SHARES_MINT } from "@/lib/server/earn";
-import { TOKEN_PROGRAMS, rpc } from "@/lib/server/portfolio";
+import { SOL_MINT, TOKEN_PROGRAMS, rpc } from "@/lib/server/portfolio";
 
 const KLEND = "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD";
-const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 type Balance = { accountIndex: number; owner?: string; mint: string; uiTokenAmount: { uiAmountString: string } };
 type Tx = {
@@ -12,8 +11,10 @@ type Tx = {
 };
 
 // amount is the change in the user's cash, in dollars: negative when money left it. logo is the asset's, for buys and sells.
-export type Activity = { signature: string; time: number; kind: Kind; title: string; amount: number; symbol?: string; logo?: string };
+// `action` is what happened, which the app names in the reader's language; `name` is the asset it happened to.
+export type Activity = { signature: string; time: number; kind: Kind; action: Action; amount: number; name?: string; symbol?: string; logo?: string };
 export type Kind = "deposit" | "withdraw" | "buy" | "sell" | "receive" | "gift" | "earn" | "loan";
+export type Action = "toEarn" | "toCash" | "borrowed" | "repaid" | "bought" | "sold" | "received" | "gifted" | "withdrew" | "deposited";
 
 type Sig = { signature: string; blockTime: number; err: unknown };
 type TokenAccounts = { value: { pubkey: string; account: { data: { parsed: { info: { mint: string } } } } }[] };
@@ -45,19 +46,19 @@ export async function activity(owner: string): Promise<Activity[]> {
     // A gift: cash went out and an asset arrived in someone else's account (a pool's account only goes down on a buy).
     const gifted = ASSETS.find((a) => tx.meta.postTokenBalances.some((b) => b.mint === a.mint && b.owner !== owner && Number(b.uiTokenAmount.uiAmountString) > Number(tx.meta.preTokenBalances.find((p) => p.accountIndex === b.accountIndex)?.uiTokenAmount.uiAmountString ?? 0)));
 
-    const named = ((): [Kind, string] | null => {
-      if (shares > 0) return ["earn", "Moved to Earn"];
-      if (shares < 0) return ["earn", "Moved to cash"];
-      if (keys.includes(KLEND)) return cash > 0 ? ["loan", "Borrowed"] : cash < 0 ? ["loan", "Repaid a loan"] : null;
-      if (asset) return cash < 0 ? ["buy", `Bought ${asset.name}`] : cash > 0 ? ["sell", `Sold ${asset.name}`] : ["receive", `Received ${asset.name}`];
-      if (gifted && cash < 0) return ["gift", `Gifted ${gifted.name}`];
-      if (cash < 0) return ["withdraw", "Withdrew"];
-      if (cash > 0) return ["deposit", "Deposited"];
+    const named = ((): [Kind, Action] | null => {
+      if (shares > 0) return ["earn", "toEarn"];
+      if (shares < 0) return ["earn", "toCash"];
+      if (keys.includes(KLEND)) return cash > 0 ? ["loan", "borrowed"] : cash < 0 ? ["loan", "repaid"] : null;
+      if (asset) return cash < 0 ? ["buy", "bought"] : cash > 0 ? ["sell", "sold"] : ["receive", "received"];
+      if (gifted && cash < 0) return ["gift", "gifted"];
+      if (cash < 0) return ["withdraw", "withdrew"];
+      if (cash > 0) return ["deposit", "deposited"];
       return null;
     })();
     if (!named) return [];
-    const [kind, title] = named;
+    const [kind, action] = named;
     const shown = kind === "gift" ? gifted : kind === "buy" || kind === "sell" || kind === "receive" ? asset : undefined;
-    return [{ signature: s.signature, time: s.blockTime * 1000, kind, title, amount: cash, ...(shown && { symbol: shown.symbol, logo: shown.logo }) }];
+    return [{ signature: s.signature, time: s.blockTime * 1000, kind, action, amount: cash, ...(shown && { name: shown.name, symbol: shown.symbol, logo: shown.logo }) }];
   });
 }

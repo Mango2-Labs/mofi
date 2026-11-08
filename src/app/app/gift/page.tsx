@@ -3,6 +3,7 @@
 import { usePrivy } from "@privy-io/react-auth";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useT } from "@/components/language";
 import { Wordmark } from "@/components/logo";
 import { AssetRow, Card, Icon } from "@/components/phone";
 import { useMofiWallet } from "@/components/signed-in";
@@ -19,6 +20,7 @@ type Gift = Awaited<ReturnType<typeof openGift>>;
 export default function GiftPage() {
   const { ready, authenticated, login } = usePrivy();
   const { address } = useMofiWallet();
+  const t = useT();
   const [gift, setGift] = useState<Gift | null>(null);
   const [invalid, setInvalid] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -55,7 +57,7 @@ export default function GiftPage() {
       }
       else setError((await sent.json()).error);
     } catch (e) {
-      setError(`This didn't go through${e instanceof Error && e.message ? ` (${e.message})` : ""}. Try again.`);
+      setError(t.claim.failed(e instanceof Error ? e.message : ""));
     } finally {
       setBusy(false);
     }
@@ -70,39 +72,39 @@ export default function GiftPage() {
       <div className="flex justify-center"><Wordmark width={72} /></div>
       {invalid ? (
         <Card className="items-center gap-2 px-5 py-8 text-center">
-          <span className="font-semibold">This isn&apos;t a gift link</span>
-          <span className="text-sm text-ink-muted">Ask your friend to send it again.</span>
+          <span className="font-semibold">{t.claim.invalid}</span>
+          <span className="text-sm text-ink-muted">{t.claim.askAgain}</span>
         </Card>
       ) : claimed ? (
         <>
           <span className="flex size-16 items-center justify-center self-center rounded-full bg-gain-soft text-gain"><Icon name="check" size={30} stroke={2.4} /></span>
-          <h1 className="text-center text-2xl font-semibold tracking-[-0.03em]">It&apos;s yours</h1>
-          <Link href="/app" className="rounded-full bg-ink py-3.5 text-center font-semibold text-on-ink">See your portfolio</Link>
+          <h1 className="text-center text-2xl font-semibold tracking-[-0.03em]">{t.claim.yours}</h1>
+          <Link href="/app" className="rounded-full bg-ink py-3.5 text-center font-semibold text-on-ink">{t.claim.seePortfolio}</Link>
         </>
       ) : (
         <>
           {!empty && <span className="flex size-16 items-center justify-center self-center rounded-full bg-gain-soft text-gain"><Icon name="gift" size={30} stroke={2} /></span>}
           <div className="flex flex-col items-center gap-1 text-center">
-            <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.03em]">{empty ? "This gift was already claimed" : "You got a gift"}</h1>
-            {!empty && <p className="text-ink-muted">{inside ? `${usd(total)} to invest with Mofi` : "Opening it…"}</p>}
+            <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.03em]">{empty ? t.claim.alreadyClaimed : t.claim.gotGift}</h1>
+            {!empty && <p className="text-ink-muted">{inside ? t.claim.toInvest(usd(total)) : t.claim.opening}</p>}
           </div>
           {!empty && items.length > 0 && (
             <Card className="px-3.5 py-0.5">
               {items.map((h) => <AssetRow key={h.mint} asset={{ name: h.name, ticker: h.symbol, value: h.value, change: h.change, logo: h.logo }} />)}
             </Card>
           )}
-          {error && <p className="px-1 text-sm text-loss">{error}</p>}
+          {error && <p className="px-1 text-sm text-loss">{t.serverError(error)}</p>}
           {!empty && inside && (
             !ready ? null : authenticated ? (
               <button type="button" onClick={claim} disabled={busy || !address} className="cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
                 {/* A new account's wallet takes a moment to appear after sign-in. */}
-                {!address ? "Setting up your Mofi wallet…" : busy ? "Claiming…" : `Claim ${usd(total)}`}
+                {!address ? t.claim.settingUp : busy ? t.claim.claiming : t.claim.claim(usd(total))}
               </button>
             ) : (
-              <button type="button" onClick={login} className="cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">Sign in with email to claim</button>
+              <button type="button" onClick={login} className="cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">{t.claim.signIn}</button>
             )
           )}
-          {empty && <Link href="/app" className="rounded-full bg-card py-3.5 text-center font-semibold">Go to Mofi</Link>}
+          {empty && <Link href="/app" className="rounded-full bg-card py-3.5 text-center font-semibold">{t.claim.goToMofi}</Link>}
         </>
       )}
     </div>

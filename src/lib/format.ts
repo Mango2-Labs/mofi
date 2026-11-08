@@ -2,6 +2,12 @@ const dollars = new Intl.NumberFormat("en-US", { style: "currency", currency: "U
 
 export const usd = (n: number) => dollars.format(n);
 
+// A price: whole cents from $1 up, four significant digits below, so $0.0166 doesn't show as $0.02.
+export const priceUsd = (n: number) => (n >= 1 ? usd(n) : `$${n.toLocaleString("en-US", { maximumSignificantDigits: 4 })}`);
+
+// Exact to a tenth of a cent when it isn't whole cents: $2.24, $2.235, $0.005.
+export const exact = (n: number) => (Math.round(n * 1000) % 10 === 0 ? usd(n) : `$${n.toFixed(3)}`);
+
 // "$1,284.50" → ["$1,284", ".50"], so cents can be set in ink-faint.
 export function splitCents(n: number): [string, string] {
   const s = usd(n);

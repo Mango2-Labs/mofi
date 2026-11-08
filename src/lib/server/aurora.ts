@@ -97,3 +97,30 @@ export async function assets(): Promise<AuroraAsset[]> {
   cached = { at: Date.now(), list };
   return list;
 }
+
+// A permanent Solana address for withdrawals: whatever USDC arrives there is converted and paid out to `recipient` as
+// `assetId`. There's one per user and destination, so its USDC account is opened only once. Refunds go to the user.
+export async function withdrawAddress(owner: string, chain: string, assetId: string, recipient: string) {
+  const data = await call("persistent-deposit-address/{key}", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ recipient, sender: owner, depositChain: "sol", destinationChain: chain, destinationAsset: assetId }),
+  });
+  return data.depositAddress as string;
+}
+
+type PersistentDeposit = { tx_hash: string; created_at: string };
+
+// Where one withdrawal through a permanent address stands. It's received once Aurora has the Solana transaction that
+// sent it, then paid out or failed. A payout doesn't name the transaction it's for, and the address may carry others,
+// so they're paired in order: the nth arrival's outcome is the nth payout or failure.
+export async function withdrawStatus(depositAddress: string, signature: string) {
+  const list = async (type: string) =>
+    ((await call(`persistent-deposit-status/{key}?type=${type}&address=${encodeURIComponent(depositAddress)}`)).deposits ?? []) as PersistentDeposit[];
+  const [received, paid, failed] = await Promise.all([list("received"), list("success"), list("failed")]);
+  const byTime = (a: { created_at: string }, b: { created_at: string }) => Date.parse(a.created_at) - Date.parse(b.created_at);
+  const nth = received.sort(byTime).findIndex((d) => d.tx_hash === signature);
+  if (nth < 0) return "PENDING_DEPOSIT";
+  const outcome = [...paid.map((d) => ({ ...d, ok: true })), ...failed.map((d) => ({ ...d, ok: false }))].sort(byTime)[nth];
+  return !outcome ? "PROCESSING" : outcome.ok ? "SUCCESS" : "FAILED";
+}

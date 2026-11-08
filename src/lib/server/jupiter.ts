@@ -1,3 +1,5 @@
+import { JUPITER_REFERRAL_ACCOUNT, TRADE_FEE_BPS } from "@/lib/fees";
+
 // Jupiter's Swap API. The key stays on the server, and errors never include it.
 // When a wallet holds under 0.01 SOL, Jupiter pays the network fee and takes it from the swap.
 const SWAP = "https://api.jup.ag/swap/v2";
@@ -31,9 +33,12 @@ export type Order = {
   errorCode?: number;
 };
 
+// Mofi's fee on every trade (see lib/fees.ts).
+const REFERRAL = { referralAccount: JUPITER_REFERRAL_ACCOUNT, referralFee: String(TRADE_FEE_BPS) };
+
 // receiver sends what's bought to another wallet (a gift); Jupiter opens its token account, paid for by payer.
 export function order(params: { inputMint: string; outputMint: string; amount: string; taker: string; payer?: string; receiver?: string }): Promise<Order> {
-  return swapApi(`order?${new URLSearchParams(params)}`);
+  return swapApi(`order?${new URLSearchParams({ ...params, ...REFERRAL })}`);
 }
 
 export function execute(signedTransaction: string, requestId: string): Promise<{ status: string; signature?: string; code: number }> {

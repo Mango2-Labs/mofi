@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { DepositFlow } from "@/components/deposit-flow";
 import { Keypad } from "@/components/keypad";
+import { useT } from "@/components/language";
 import { usePendingBuy } from "@/components/pending-buy";
 import { AssetIcon, Card, Icon } from "@/components/phone";
-import { PoweredBy } from "@/components/powered-by";
 import { Sheet } from "@/components/sheet";
 import { units, type AssetInfo } from "@/lib/assets";
-import { splitCents, usd } from "@/lib/format";
+import { TRADE_FEE_BPS, tradeFee } from "@/lib/fees";
+import { exact, priceUsd, splitCents, usd } from "@/lib/format";
 import type { Portfolio } from "@/lib/use-portfolio";
 import { TradeError, useTrade } from "@/lib/use-trade";
 
@@ -18,10 +19,11 @@ const MIN = 1;
 // inside the same sheet, and Mofi buys once it lands.
 export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: AssetInfo; side: "buy" | "sell"; price?: number; portfolio: Portfolio | null; onClose: () => void }) {
   const trade = useTrade();
+  const t = useT();
   const { pending, result, start, cancel, setShown } = usePendingBuy();
   const [amount, setAmount] = useState("");
   const [depositing, setDepositing] = useState(false);
-  const [done, setDone] = useState<{ spent: number; signature: string } | null>(null);
+  const [done, setDone] = useState<{ spent: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -32,8 +34,12 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
   const short = side === "buy" && dollars > cash ? Math.ceil((dollars - cash) * 1.01 * 100) / 100 : 0;
   const tooMuch = side === "sell" && dollars > holding + 0.005;
   const landed = depositing && result?.status === "done" && result.symbol === asset.symbol ? result : null;
-  const finished = done ?? (landed && { spent: landed.spent, signature: landed.signature });
+  const finished = done ?? (landed && { spent: landed.spent });
   const [whole, cents] = splitCents(dollars);
+  // Mofi's fee comes out of what's bought (or out of the cash a sale brings in).
+  const fee = tradeFee(dollars);
+  // Under $1 can still be sold when it's everything held, so a small position is never stuck.
+  const min = side === "buy" ? MIN : Math.max(0.01, Math.min(MIN, Math.floor(holding * 100) / 100));
 
   // While this sheet shows the deposit's progress, the app-wide toast stays out of the way.
   useEffect(() => {
@@ -46,31 +52,31 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
     setBusy(true);
     setError(null);
     try {
-      setDone({ spent: dollars, signature: await trade.execute(await trade.order(side, asset.symbol, dollars.toFixed(2))) });
+      await trade.execute(await trade.order(side, asset.symbol, dollars.toFixed(2)));
+      setDone({ spent: dollars });
     } catch (e) {
-      setError(e instanceof TradeError ? e.message : "This didn't go through, and your money didn't move. Try again.");
+      setError(e instanceof TradeError ? e.message : t.common.failed);
     } finally {
       setBusy(false);
     }
   };
 
-  const steps = ["Waiting for your deposit", "Lands as cash", `Mofi buys ${asset.name}`];
+  const steps = t.trade.steps(asset.name);
   // Which step is under way: the deposit is awaited (0) until the buy starts (2).
   const progress = landed ? 3 : result?.status === "buying" ? 2 : pending ? 0 : -1;
 
   return (
-    <Sheet label={`${side === "buy" ? "Buy" : "Sell"} ${asset.name}`} onClose={onClose}>
+    <Sheet label={t.trade.title(side, asset.name)} onClose={onClose}>
       {finished ? (
         <>
           <span className="mt-4 flex size-16 items-center justify-center self-center rounded-full bg-gain-soft text-gain"><Icon name="check" size={30} stroke={2.4} /></span>
           <div className="flex flex-col items-center gap-1 text-center">
-            <h2 className="text-2xl font-semibold tracking-[-0.03em]">{side === "buy" ? `You bought ${asset.name}` : `You sold ${asset.name}`}</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">{side === "buy" ? t.trade.bought(asset.name) : t.trade.sold(asset.name)}</h2>
             <p className="text-sm text-ink-muted">
-              {side === "buy" ? `About ${price ? units(asset, finished.spent / price) : asset.name} for ${usd(finished.spent)}.` : `${usd(finished.spent)} is in your cash.`}
+              {side === "buy" ? t.trade.boughtText(price ? units(asset, (finished.spent - tradeFee(finished.spent)) / price, t.common.shares) : asset.name, usd(finished.spent)) : t.trade.soldText(usd(finished.spent - tradeFee(finished.spent)))}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="h-13 cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">Done</button>
-          <a href={`https://solscan.io/tx/${finished.signature}`} target="_blank" rel="noreferrer" className="self-center text-sm text-ink-muted underline">View on Solscan</a>
+          <button type="button" onClick={onClose} className="h-13 cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">{t.common.done}</button>
         </>
       ) : depositing ? (
         <DepositFlow
@@ -91,47 +97,52 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
               </div>
             ))}
           </Card>
-          {result?.status === "failed" && <p className="px-1 text-sm text-loss">Your deposit landed as cash, but the buy didn&apos;t go through: {result.error}</p>}
-          <p className="px-2 text-center text-xs text-ink-muted">Keep Mofi open. If you close it, the buy runs next time you open the app.</p>
+          {result?.status === "failed" && <p className="px-1 text-sm text-loss">{t.trade.buyFailed(t.serverError(result.error))}</p>}
+          <p className="px-2 text-center text-xs text-ink-muted">{t.trade.keepOpen}</p>
         </DepositFlow>
       ) : (
         <>
           <div className="flex items-center gap-2.5">
             <AssetIcon asset={{ ticker: asset.symbol, logo: asset.logo }} size={32} />
-            <h2 className="flex-1 text-[17px] font-semibold">{side === "buy" ? "Buy" : "Sell"} {asset.name}</h2>
-            <button type="button" onClick={onClose} aria-label="Close" className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-card"><Icon name="plus" size={16} stroke={2.4} className="rotate-45" /></button>
+            <h2 className="flex-1 text-[17px] font-semibold">{t.trade.title(side, asset.name)}</h2>
+            <button type="button" onClick={onClose} aria-label={t.common.close} className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-card"><Icon name="plus" size={16} stroke={2.4} className="rotate-45" /></button>
           </div>
           <div className="flex flex-col items-center gap-1 py-3">
             <span className={`text-[64px] leading-none font-semibold tracking-[-0.05em] tabular-nums ${amount ? "" : "text-ink-faint"}`}>
               {whole}{amount.includes(".") && <span className="text-ink-faint">{cents}</span>}
             </span>
-            <span className="text-sm text-ink-muted tabular-nums">{price && dollars ? `About ${units(asset, dollars / price)}` : `At ${price ? usd(price) : "—"}`}</span>
+            <span className="text-sm text-ink-muted tabular-nums">{price && dollars ? t.trade.about(units(asset, (side === "buy" ? dollars - fee : dollars) / price, t.common.shares)) : t.trade.at(price ? priceUsd(price) : "—")}</span>
           </div>
           <Card className="px-3.5 py-0.5">
             <div className="flex items-center gap-3 py-3">
               <span className="flex size-8 items-center justify-center rounded-full bg-gain-soft font-semibold text-gain">$</span>
               <span className="flex flex-1 flex-col leading-tight">
-                <span className="text-[11px] text-ink-muted">{side === "buy" ? "Pay with" : "You own"}</span>
-                <span className="text-sm font-semibold tabular-nums">{side === "buy" ? `Cash · ${usd(cash)}` : usd(holding)}</span>
+                <span className="text-[11px] text-ink-muted">{side === "buy" ? t.trade.payWith : t.trade.youOwn}</span>
+                <span className="text-sm font-semibold tabular-nums">{side === "buy" ? t.trade.cash(usd(cash)) : usd(holding)}</span>
               </span>
-              <button type="button" onClick={() => setAmount((Math.floor((side === "buy" ? cash : holding) * 100) / 100).toFixed(2))} className="cursor-pointer rounded-full bg-surface-app px-3 py-1.5 text-xs font-semibold">Max</button>
+              <button type="button" onClick={() => setAmount((Math.floor((side === "buy" ? cash : holding) * 100) / 100).toFixed(2))} className="cursor-pointer rounded-full bg-surface-app px-3 py-1.5 text-xs font-semibold">{t.common.max}</button>
             </div>
             {short > 0 && (
               <div className="flex items-center gap-3 border-t border-divider py-3">
                 <span className="flex size-8 items-center justify-center rounded-full bg-surface-app"><Icon name="plus" size={14} stroke={2.4} /></span>
                 <span className="flex flex-1 flex-col leading-tight">
-                  <span className="text-sm font-semibold">Deposit {usd(short)} from any chain</span>
-                  <span className="text-xs text-ink-muted">Mofi buys {asset.name} the moment it lands</span>
+                  <span className="text-sm font-semibold">{t.trade.depositShort(usd(short))}</span>
+                  <span className="text-xs text-ink-muted">{t.trade.buysWhenLands(asset.name)}</span>
                 </span>
+              </div>
+            )}
+            {dollars > 0 && (
+              <div className="flex items-center justify-between border-t border-divider py-3 text-sm">
+                <span className="text-ink-muted">{t.trade.fee(`${TRADE_FEE_BPS / 100}%`)}</span>
+                <span className="font-semibold tabular-nums">{exact(fee)}</span>
               </div>
             )}
           </Card>
           <Keypad value={amount} onChange={(next) => { setAmount(next); setError(null); }} />
-          {error && <p className="px-1 text-sm text-loss">{error}</p>}
-          <button type="button" onClick={submit} disabled={busy || dollars < MIN || tooMuch} className="cursor-pointer rounded-full bg-ink py-4 text-base font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
-            {busy ? (side === "buy" ? "Buying…" : "Selling…") : short > 0 ? `Deposit ${usd(short)} and buy` : `${side === "buy" ? "Buy" : "Sell"} ${dollars ? usd(dollars) : ""}`.trim()}
+          {error && <p className="px-1 text-sm text-loss">{t.serverError(error)}</p>}
+          <button type="button" onClick={submit} disabled={busy || dollars < min || tooMuch} className="cursor-pointer rounded-full bg-ink py-4 text-base font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
+            {busy ? t.trade.busy(side) : short > 0 ? t.trade.depositAndBuy(usd(short)) : t.trade.submit(side, dollars ? usd(dollars) : "")}
           </button>
-          <PoweredBy by={side === "buy" ? "Bought on Jupiter · No network fee" : "Sold on Jupiter · No network fee"} />
         </>
       )}
     </Sheet>

@@ -3,7 +3,7 @@ import { EARN_SHARES_MINT, earnMetrics } from "@/lib/server/earn";
 import { prices } from "@/lib/server/jupiter";
 
 export const TOKEN_PROGRAMS = ["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"];
-const SOL_MINT = "So11111111111111111111111111111111111111112";
+export const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com", {
