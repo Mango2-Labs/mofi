@@ -112,15 +112,15 @@ export async function withdrawAddress(owner: string, chain: string, assetId: str
 type PersistentDeposit = { tx_hash: string; created_at: string };
 
 // Where one withdrawal through a permanent address stands. It's received once Aurora has the Solana transaction that
-// sent it, then paid out or failed; payouts are matched by time, since the address may have earlier ones.
-export async function withdrawStatus(depositAddress: string, signature: string, since: number) {
-  const list = (type: string) =>
-    call(`persistent-deposit-status/{key}?type=${type}&address=${encodeURIComponent(depositAddress)}`)
-      .then((d) => (d.deposits ?? []) as PersistentDeposit[])
-      .catch(() => [] as PersistentDeposit[]);
+// sent it, then paid out or failed. A payout doesn't name the transaction it's for, and the address may carry others,
+// so they're paired in order: the nth arrival's outcome is the nth payout or failure.
+export async function withdrawStatus(depositAddress: string, signature: string) {
+  const list = async (type: string) =>
+    ((await call(`persistent-deposit-status/{key}?type=${type}&address=${encodeURIComponent(depositAddress)}`)).deposits ?? []) as PersistentDeposit[];
   const [received, paid, failed] = await Promise.all([list("received"), list("success"), list("failed")]);
-  const after = (d: PersistentDeposit) => Date.parse(d.created_at) >= since - 60_000;
-  if (paid.some(after)) return "SUCCESS";
-  if (failed.some(after)) return "FAILED";
-  return received.some((d) => d.tx_hash === signature) ? "PROCESSING" : "PENDING_DEPOSIT";
+  const byTime = (a: { created_at: string }, b: { created_at: string }) => Date.parse(a.created_at) - Date.parse(b.created_at);
+  const nth = received.sort(byTime).findIndex((d) => d.tx_hash === signature);
+  if (nth < 0) return "PENDING_DEPOSIT";
+  const outcome = [...paid.map((d) => ({ ...d, ok: true })), ...failed.map((d) => ({ ...d, ok: false }))].sort(byTime)[nth];
+  return !outcome ? "PROCESSING" : outcome.ok ? "SUCCESS" : "FAILED";
 }

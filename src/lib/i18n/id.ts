@@ -235,7 +235,7 @@ export const id: Messages = {
     noExtra: "Tanpa biaya tambahan",
     youGet: "Kamu terima sekitar",
     fees: "Biaya",
-    setup: "Penyiapan alamat (sekali)",
+    setup: "Penyiapan alamat",
     taken: "Diambil dari saldo",
     arrives: "Tiba dalam",
     minutes: (n) => `sekitar ${n} menit`,

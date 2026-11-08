@@ -10,7 +10,7 @@ const fail = (message: string, status = 400) => Response.json({ error: message }
 
 // A withdrawal is a USDC transfer to a Solana address of Aurora's that pays out on the chosen chain. A normal one goes
 // to the user's permanent address for that destination, so its USDC account is opened once. A private one (or any,
-// while the shared store isn't set up) takes a fresh address from a quote each time. The server builds the transfer
+// while the shared store or Aurora's permanent addresses aren't available) takes a fresh address from a quote each time. The server builds the transfer
 // itself, so the fee wallet never signs for an address a client chose. Mofi charges nothing, except the exact cost of
 // opening an account once a user's free openings are used up (see withdraw-setup.ts). Pricing never creates addresses.
 // `amount` is everything taken from the user's cash: that setup cost, if any, and Aurora gets the rest.
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       // Aurora's cost at this size is what goes in minus what comes out, so sending want + that cost arrives as about want.
       // The total is rounded up to a tenth of a cent, and exactly that is taken when the user withdraws.
       const price = async (privately: boolean) => {
-        const known = !privately && kvReady() ? await knownAddress(owner, to.chain, to.assetId, recipient) : null;
+        const known = !privately && kvReady() ? await knownAddress(owner, to.chain, to.assetId, recipient).catch(() => null) : null;
         const [q, setup] = await Promise.all([quote(BigInt(amount), privately, true), setupCost(owner, known)]);
         const cost = Math.max(0, want - q.amountOutUsd);
         return {
@@ -72,10 +72,11 @@ export async function POST(req: Request) {
       return Response.json({ plain, private: hidden });
     }
 
-    // The setup cost is worked out again here and must match what the user saw, so nobody pays a surprise.
-    const depositAddress = permanent ? await permanentAddress(owner, to.chain, to.assetId, recipient) : null;
+    // The setup cost is worked out again here and can't be more than what the user saw, so nobody pays a surprise. If
+    // it's less, the difference goes to Aurora with the rest, so more arrives.
+    const depositAddress = permanent ? await permanentAddress(owner, to.chain, to.assetId, recipient).catch(() => null) : null;
     const setup = await setupCost(owner, depositAddress, { reserve: true });
-    if (Math.abs(setup - Number(body?.setup ?? 0)) > 0.0005) return fail("The network setup cost changed. Check the new total and try again.", 409);
+    if (!(setup <= Number(body?.setup ?? 0) + 0.0005)) return fail("The network setup cost changed. Check the new total and try again.", 409);
     const fee = BigInt(Math.round(setup * 1e6));
     const send = BigInt(amount) - fee;
     if (!depositAddress) {
@@ -83,10 +84,11 @@ export async function POST(req: Request) {
       const transaction = await payUsdc(owner, q.depositAddress, send, fee);
       return Response.json({ transaction, depositAddress: q.depositAddress, amountOut: q.amountOut, timeEstimate: q.timeEstimate });
     }
-    // A permanent address converts at arrival, so the payout shown is a dry quote's estimate.
-    const estimate = await quote(send, false, true).catch(() => null);
-    const transaction = await payUsdc(owner, depositAddress!, send, fee);
-    return Response.json({ transaction, depositAddress, permanent: true, amountOut: estimate?.amountOut ?? null, timeEstimate: estimate?.timeEstimate ?? 120 });
+    // A permanent address converts at arrival, so the payout shown is a dry quote's estimate. It must succeed, so
+    // nothing is sent that Aurora can't pay out now (below its minimum, or no route).
+    const estimate = await quote(send, false, true);
+    const transaction = await payUsdc(owner, depositAddress, send, fee);
+    return Response.json({ transaction, depositAddress, permanent: true, amountOut: estimate.amountOut, timeEstimate: estimate.timeEstimate });
   } catch (e) {
     return fail(e instanceof AuroraError || e instanceof SetupError ? e.message : "Something went wrong. Try again.", 502);
   }

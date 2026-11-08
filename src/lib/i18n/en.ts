@@ -153,7 +153,7 @@ export const en = {
     noExtra: "No extra cost",
     youGet: "You get about",
     fees: "Fees",
-    setup: "One-time setup for this address",
+    setup: "Address setup",
     taken: "Taken from your cash",
     arrives: "Arrives in",
     minutes: (n: number) => `about ${n} min`,

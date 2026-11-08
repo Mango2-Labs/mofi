@@ -73,7 +73,7 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
           <div className="flex flex-col items-center gap-1 text-center">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">{side === "buy" ? t.trade.bought(asset.name) : t.trade.sold(asset.name)}</h2>
             <p className="text-sm text-ink-muted">
-              {side === "buy" ? t.trade.boughtText(price ? units(asset, finished.spent / price, t.common.shares) : asset.name, usd(finished.spent)) : t.trade.soldText(usd(finished.spent))}
+              {side === "buy" ? t.trade.boughtText(price ? units(asset, (finished.spent - tradeFee(finished.spent)) / price, t.common.shares) : asset.name, usd(finished.spent)) : t.trade.soldText(usd(finished.spent - tradeFee(finished.spent)))}
             </p>
           </div>
           <button type="button" onClick={onClose} className="h-13 cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">{t.common.done}</button>

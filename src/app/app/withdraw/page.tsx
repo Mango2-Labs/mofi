@@ -18,9 +18,9 @@ import { usePoll } from "@/lib/use-poll";
 import { usePortfolio } from "@/lib/use-portfolio";
 import { useSwapStatus } from "@/lib/use-swap-status";
 
-type Quote = { transaction: string; depositAddress: string; amountOut: string | null; timeEstimate: number; permanent?: boolean };
-// total is everything taken from cash for the amount typed to arrive, fees on top. setup is the one-time cost of opening
-// the destination's account, when the user pays it (see withdraw-setup.ts); it's part of total.
+type Quote = { transaction: string; depositAddress: string; amountOut: string; timeEstimate: number; permanent?: boolean };
+// total is everything taken from cash for the amount typed to arrive, fees on top. setup is the cost of opening the
+// destination's account, when the user pays it (see withdraw-setup.ts); it's part of total.
 type Price = { total: number; setup: number; amountOut: number; timeEstimate: number };
 // What the withdrawal comes to, with and without Private. priv is null when there's no private route.
 type Priced = { key: string; plain?: Price; priv?: Price | null; error?: string };
@@ -51,7 +51,9 @@ function Withdraw() {
   const [confidential, setConfidential] = useState(false);
   const [priced, setPriced] = useState<Priced | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [sent, setSent] = useState<{ tx: string; at: number } | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  // Bumped to price again when the setup cost changed after pricing.
+  const [round, setRound] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const status = useSwapStatus(sent && quote ? quote.depositAddress : null, quote?.permanent ? sent ?? undefined : undefined);
@@ -75,7 +77,7 @@ function Withdraw() {
       if (live) setPriced(res?.ok && data ? { key: priceKey, plain: data.plain, priv: data.private } : { key: priceKey, error: data?.error });
     }, 600);
     return () => { live = false; clearTimeout(timer); };
-  }, [priceKey, assetId, amount, recipient, address]);
+  }, [priceKey, assetId, amount, recipient, address, round]);
   const now = priced?.key === priceKey ? priced : null;
   const checking = !!priceKey && !now;
   const price = confidential ? now?.priv : now?.plain;
@@ -104,14 +106,17 @@ function Withdraw() {
       if (!price) return;
       const res = await postJson("/api/cash-out", { assetId, amount: price.total.toFixed(3), setup: price.setup, owner: address, recipient, private: confidential });
       const data = await res.json();
+      if (res.status === 409) {
+        setPriced(null);
+        setRound((r) => r + 1);
+      }
       if (!res.ok) return setError(data.error);
       if (!wallet) return;
       setQuote(data);
       const { signedTransaction } = await signTransaction({ transaction: fromBase64(data.transaction), wallet, chain: "solana:mainnet" });
-      const at = Date.now();
       const sentRes = await postJson("/api/send", { transaction: toBase64(signedTransaction) });
       const result = await sentRes.json();
-      if (sentRes.ok) setSent({ tx: result.signature, at });
+      if (sentRes.ok) setSent(result.signature);
       else setError(result.error);
     });
 
@@ -210,7 +215,7 @@ function Withdraw() {
           <span className="max-w-[260px] self-center text-center text-sm text-ink-muted" aria-live="polite">
             {status === "REFUNDED" || status === "FAILED"
               ? t.withdraw.sentBackText
-              : t.withdraw.onItsWayText(quote.amountOut ? `${amountOf(quote.amountOut)} ${to.symbol}` : to.symbol, short(recipient.trim()), chainName(chain))}
+              : t.withdraw.onItsWayText(`${amountOf(quote.amountOut)} ${to.symbol}`, short(recipient.trim()), chainName(chain))}
           </span>
           {status !== "REFUNDED" && status !== "FAILED" && (
             <Card className="px-4 py-1 text-sm">

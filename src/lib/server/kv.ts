@@ -21,5 +21,11 @@ async function run<T>(commands: (string | number)[][]): Promise<T[]> {
 export const kvGet = async (key: string) => (await run<string | null>([["GET", key]]))[0];
 export const kvSet = async (key: string, value: string) => void (await run([["SET", key, value]]));
 
-// Adds one and returns the new count; the key expires `ttl` seconds after its last increment.
-export const kvIncr = async (key: string, ttl: number) => (await run<number>([["INCR", key], ["EXPIRE", key, ttl]]))[0];
+// Adds `member` to the set at `key` and returns how many it holds; the key expires `ttl` seconds after its last add.
+export const kvAdd = async (key: string, member: string, ttl: number) => (await run<number>([["SADD", key, member], ["EXPIRE", key, ttl], ["SCARD", key]]))[2];
+
+// How many the set at `key` would hold once `member` (or a new member, for null) is added.
+export async function kvCountWith(key: string, member: string | null) {
+  const [has, count] = await run<number>([["SISMEMBER", key, member ?? ""], ["SCARD", key]]);
+  return count + (member && has ? 0 : 1);
+}

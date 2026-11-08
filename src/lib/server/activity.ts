@@ -1,9 +1,8 @@
 import { ASSETS, USDC_MINT } from "@/lib/assets";
 import { EARN_SHARES_MINT } from "@/lib/server/earn";
-import { TOKEN_PROGRAMS, rpc } from "@/lib/server/portfolio";
+import { SOL_MINT, TOKEN_PROGRAMS, rpc } from "@/lib/server/portfolio";
 
 const KLEND = "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD";
-const SOL_MINT = "So11111111111111111111111111111111111111112";
 
 type Balance = { accountIndex: number; owner?: string; mint: string; uiTokenAmount: { uiAmountString: string } };
 type Tx = {

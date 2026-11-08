@@ -14,7 +14,7 @@ import { TradeError, useTrade } from "@/lib/use-trade";
 // Aurora delivers it as cash, and Mofi buys as soon as it lands. The buy needs the user's wallet, so it
 // runs while any Mofi page is open; the order is remembered in this browser until then.
 export type PendingBuy = { symbol: string; amount: number; needed: number; baseline: number; at: number };
-export type BuyResult = { status: "buying" } | { status: "done"; symbol: string; spent: number; signature: string } | { status: "failed"; symbol: string; error: string };
+export type BuyResult = { status: "buying" } | { status: "done"; symbol: string; spent: number } | { status: "failed"; symbol: string; error: string };
 
 const KEY = "mofi:pending-buy";
 const DAY = 86_400_000;
@@ -68,8 +68,8 @@ export function PendingBuyProvider({ children }: { children: ReactNode }) {
     const buy = async () => {
       setResult({ status: "buying" });
       try {
-        const signature = await execute(await order("buy", pending.symbol, spend.toFixed(2)));
-        setResult({ status: "done", symbol: pending.symbol, spent: spend, signature });
+        await execute(await order("buy", pending.symbol, spend.toFixed(2)));
+        setResult({ status: "done", symbol: pending.symbol, spent: spend });
       } catch (e) {
         setResult({ status: "failed", symbol: pending.symbol, error: e instanceof TradeError ? e.message : t.trade.buyDidntGoThrough });
       } finally {
