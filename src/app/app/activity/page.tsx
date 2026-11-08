@@ -3,7 +3,7 @@
 import { useT } from "@/components/language";
 import { AssetIcon, Card, Icon, type IconName } from "@/components/phone";
 import { SignedIn, useMofiWallet } from "@/components/signed-in";
-import { exact } from "@/lib/format";
+import { useMoney } from "@/components/currency";
 import type { Activity as Item, Kind } from "@/lib/server/activity";
 import { usePoll } from "@/lib/use-poll";
 
@@ -37,6 +37,7 @@ const BADGE: Record<Exclude<Kind, "buy" | "sell" | "receive" | "gift">, { icon: 
 function Activity() {
   const { address } = useMofiWallet();
   const t = useT();
+  const m = useMoney();
   const { data, error } = usePoll<Item[]>(address ? `/api/activity?owner=${address}` : null, 30_000);
   const days = (data ?? []).reduce<[string, Item[]][]>((groups, a) => {
     const label = day(a.time, t.activity, t.locale);
@@ -74,7 +75,7 @@ function Activity() {
                     </span>
                     {a.amount !== 0 && (
                       <span className={`text-[15px] font-semibold tabular-nums ${a.amount > 0 ? "text-gain" : ""}`}>
-                        {a.amount > 0 ? "+" : "−"}{exact(Math.abs(a.amount))}
+                        {a.amount > 0 ? "+" : "−"}{m.exact(Math.abs(a.amount))}
                       </span>
                     )}
                   </a>

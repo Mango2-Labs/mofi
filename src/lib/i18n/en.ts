@@ -23,6 +23,7 @@ export const en = {
     failed: "This didn't go through, and your money didn't move. Try again.",
     unreachable: "Couldn't reach Mofi. Check your connection.",
     language: "Language",
+    currency: "Currency",
     yourAddress: (chain: string) => `Your ${chain} address`,
     qr: "QR code of the address",
   },

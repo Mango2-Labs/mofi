@@ -105,6 +105,7 @@ export const id: Messages = {
     failed: "Transaksi gagal, dan uangmu tidak berpindah. Coba lagi.",
     unreachable: "Mofi tidak bisa dihubungi. Cek koneksi kamu.",
     language: "Bahasa",
+    currency: "Mata uang",
     yourAddress: (chain) => `Alamat ${chain} kamu`,
     qr: "Kode QR alamat",
   },

@@ -20,3 +20,17 @@ export const pct = (n: number) => `${n < 0 ? "−" : "+"}${Math.abs(n).toFixed(1
 
 // Fees under a cent read as "Under $0.01" rather than "$0.00".
 export const feeUsd = (n: number) => (n < 0.01 ? "Under $0.01" : usd(n));
+
+export type Currency = "usd" | "idr";
+export const CURRENCY_COOKIE = "currency";
+
+// Rupiah by hand, the same on the server and in every browser: whole rupiah with Indonesian dots ("Rp 1.650.000"),
+// and three significant digits below Rp 100 ("Rp 0,361").
+const rupiah = (n: number) => `Rp ${n >= 100 ? Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".") : Number(n.toPrecision(3)).toString().replace(".", ",")}`;
+
+// How amounts held are shown: in rupiah at `rate` per dollar, or in dollars when there's no rate.
+export function moneyIn(rate: number | null) {
+  if (!rate) return { money: usd, price: priceUsd, exact, split: splitCents, none: "$—" };
+  const idr = (n: number) => rupiah(n * rate);
+  return { money: idr, price: idr, exact: idr, split: (n: number): [string, string] => [idr(n), ""], none: "Rp —" };
+}

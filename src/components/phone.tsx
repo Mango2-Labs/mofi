@@ -1,7 +1,10 @@
+"use client";
+
 import Image from "next/image";
 import type { ReactNode } from "react";
 import type { Asset } from "@/lib/examples";
-import { pct, priceUsd, splitCents, usd } from "@/lib/format";
+import { useMoney } from "@/components/currency";
+import { pct, splitCents } from "@/lib/format";
 
 const ICONS = {
   back: <path d="M15 5l-7 7 7 7" />,
@@ -57,8 +60,10 @@ export function Header({ title }: { title: string }) {
   );
 }
 
-export function Money({ value, className = "" }: { value: number; className?: string }) {
-  const [whole, cents] = splitCents(value);
+// An amount held, in the viewer's currency; `dollars` keeps it in dollars (amounts typed in, loans).
+export function Money({ value, dollars = false, className = "" }: { value: number; dollars?: boolean; className?: string }) {
+  const split = useMoney().split;
+  const [whole, cents] = (dollars ? splitCents : split)(value);
   return (
     <span className={`font-semibold tracking-[-0.04em] tabular-nums ${className}`}>
       {whole}<span className="text-ink-faint">{cents}</span>
@@ -95,6 +100,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 
 // With `price`, the value is a price per share or coin rather than an amount held.
 export function AssetRow({ asset, sub, price = false }: { asset: Asset; sub?: string; price?: boolean }) {
+  const m = useMoney();
   return (
     <div className="flex items-center gap-2.5 border-b border-divider py-[9px] last:border-0">
       <AssetIcon asset={asset} />
@@ -103,7 +109,7 @@ export function AssetRow({ asset, sub, price = false }: { asset: Asset; sub?: st
         <span className="text-[11px] text-ink-muted">{sub ?? asset.ticker}</span>
       </span>
       <span className="flex flex-col items-end leading-tight tabular-nums">
-        <span className="text-[13px] font-semibold">{price ? priceUsd(asset.value) : usd(asset.value)}</span>
+        <span className="text-[13px] font-semibold">{price ? m.price(asset.value) : m.money(asset.value)}</span>
         <Change value={asset.change} className="text-[11px]" />
       </span>
     </div>

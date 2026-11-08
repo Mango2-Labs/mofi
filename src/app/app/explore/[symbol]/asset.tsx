@@ -9,7 +9,7 @@ import { GiftSheet } from "@/components/gift-sheet";
 import { useT } from "@/components/language";
 import { TradeSheet } from "@/components/trade-sheet";
 import { GIFTABLE, units, type AssetInfo } from "@/lib/assets";
-import { priceUsd, usd } from "@/lib/format";
+import { useMoney } from "@/components/currency";
 import { usePortfolio, usePrices } from "@/lib/use-portfolio";
 
 // The assets Kamino lends against (see lib/server/kamino.ts).
@@ -28,6 +28,7 @@ function Asset({ asset }: { asset: AssetInfo }) {
   const { portfolio } = usePortfolio(address);
   const price = usePrices()?.[asset.mint];
   const t = useT();
+  const m = useMoney();
   const [side, setSide] = useState<"buy" | "sell" | null>(null);
   // Arriving from Account's "Send a gift" (?gift=1) opens the Gift sheet straight away.
   const giftable = GIFTABLE.has(asset.symbol);
@@ -46,14 +47,14 @@ function Asset({ asset }: { asset: AssetInfo }) {
           <h1 className="text-[15px] font-semibold">{asset.name}</h1>
           <span className="rounded-full bg-card px-2 py-0.5 text-[11px] font-medium text-ink-muted">{t.kind[asset.kind]}</span>
         </span>
-        {price ? (price.usdPrice >= 1 ? <Money value={price.usdPrice} className="text-[40px] leading-[1.1]" /> : <span className="text-[40px] leading-[1.1] font-semibold tracking-[-0.04em] tabular-nums">{priceUsd(price.usdPrice)}</span>) : <span className="text-[40px] leading-[1.1] font-semibold text-ink-faint">$—</span>}
+        {price ? (price.usdPrice >= 1 ? <Money value={price.usdPrice} className="text-[40px] leading-[1.1]" /> : <span className="text-[40px] leading-[1.1] font-semibold tracking-[-0.04em] tabular-nums">{m.price(price.usdPrice)}</span>) : <span className="text-[40px] leading-[1.1] font-semibold text-ink-faint">{m.none}</span>}
         {price && <span className="text-[13px]"><Change value={price.priceChange24h ?? 0} className="font-medium" /> <span className="text-ink-muted">{t.common.today}</span></span>}
       </div>
 
       {holding && (
         <Card className="gap-1 p-4">
           <span className="text-xs text-ink-muted">{t.asset.youOwn}</span>
-          <span className="text-xl font-semibold tabular-nums">{usd(holding.value)}</span>
+          <span className="text-xl font-semibold tabular-nums">{m.money(holding.value)}</span>
           <span className="text-sm text-ink-muted tabular-nums">{units(asset, holding.amount, t.common.shares)}</span>
         </Card>
       )}

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChainSelect, Logo } from "@/components/chain-select";
 import { Field } from "@/components/field";
+import { Approx } from "@/components/currency";
 import { useT } from "@/components/language";
 import { Card, Icon } from "@/components/phone";
 import { PoweredBy } from "@/components/powered-by";
@@ -163,6 +164,7 @@ function Withdraw() {
           >
             <span className="flex items-center text-[28px] font-semibold tracking-[-0.03em] tabular-nums">
               $<input id="amount" inputMode="decimal" autoComplete="off" placeholder="0" value={amount} onChange={(e) => /^\d*\.?\d{0,2}$/.test(e.target.value) && setAmount(e.target.value)} className="w-full bg-transparent outline-none placeholder:text-ink-faint" />
+              <Approx dollars={dollars} className="shrink-0 text-sm font-medium tracking-normal" />
             </span>
           </Field>
           <Field id="recipient" label={t.common.yourAddress(chainName(chain))} hint={t.withdraw.addressHint}>
