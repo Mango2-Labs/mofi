@@ -86,7 +86,7 @@ const PATTERNS: [RegExp, (m: RegExpMatchArray) => string][] = [
 
 export const id: Messages = {
   locale: "id-ID",
-  meta: { title: "Mofi · Investasi jadi mudah", description: "Miliki SpaceX, Nvidia, dan S&P 500 mulai dari beberapa dolar." },
+  meta: { title: "Mofi · Investasi jadi mudah", description: "Beli dan jual saham, ETF, dan kripto 24/7 mulai dari $1, atau jadikan jaminan untuk pinjaman." },
 
   common: {
     back: "Kembali",
@@ -113,7 +113,7 @@ export const id: Messages = {
   hero: {
     title: "Investasi",
     titleFaint: "jadi mudah",
-    lead: "Miliki SpaceX, Nvidia, dan S&P 500 mulai dari beberapa dolar.",
+    lead: "Beli dan jual saham, ETF, dan kripto 24/7 mulai dari $1, atau jadikan jaminan untuk pinjaman.",
     getStarted: "Mulai",
     signIn: "Masuk dengan email",
     privyHeader: "Masuk ke Mofi",
