@@ -54,7 +54,7 @@ export default async function Landing() {
             <h1 className="text-[clamp(44px,5.6vw,76px)] leading-[1.02] font-semibold tracking-[-0.04em] text-balance">
               {t.hero.title} <span className="text-ink-faint">{t.hero.titleFaint}</span>
             </h1>
-            <p className="max-w-[30em] text-[19px] text-ink-muted">{t.hero.lead}</p>
+            <p className="max-w-[30em] text-[19px] text-balance text-ink-muted">{t.hero.lead}</p>
             <div className="flex gap-3">
               <GetStarted label={t.hero.getStarted} className="flex-1 sm:flex-none" />
               <a href="#how" className="flex-1 rounded-full border border-zinc-300 bg-card px-[25px] py-[13px] text-center font-semibold sm:flex-none">{l.howItWorks}</a>
@@ -173,7 +173,6 @@ export default async function Landing() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-x-6 gap-y-3 text-sm text-ink-muted">
           <Wordmark width={62} />
           <span>{l.notInUs}</span>
-          <a href="https://github.com/Mango2-Labs/mofi" className="font-medium text-ink">GitHub</a>
         </div>
       </footer>
     </main>

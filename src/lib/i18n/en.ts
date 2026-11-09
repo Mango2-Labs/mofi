@@ -4,7 +4,7 @@ const side = (s: "buy" | "sell") => (s === "buy" ? "Buy" : "Sell");
 
 export const en = {
   locale: "en-US",
-  meta: { title: "Mofi · Investing made simple", description: "Own SpaceX, Nvidia and the S&P 500 with a few dollars." },
+  meta: { title: "Mofi · Investing made simple", description: "Buy and sell stocks, ETFs and crypto 24/7 from $1, or borrow against them." },
 
   common: {
     back: "Back",
@@ -31,7 +31,7 @@ export const en = {
   hero: {
     title: "Investing",
     titleFaint: "made simple",
-    lead: "Own SpaceX, Nvidia and the S&P 500 with a few dollars.",
+    lead: "Buy and sell stocks, ETFs and crypto 24/7 from $1, or borrow against them.",
     getStarted: "Get started",
     signIn: "Sign in with email",
     privyHeader: "Sign in to Mofi",
