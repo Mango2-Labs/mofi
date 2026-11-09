@@ -337,7 +337,7 @@ export const en = {
       ["What does Private do?", "It sends your withdrawal so nobody can link the address it goes to with your Mofi wallet. It costs a little more, and Mofi shows exactly how much."],
       ["Does my cash earn anything?", "Cash you move into Earn is lent out through Kamino and earns interest every second. The rate changes with demand, and you can move it back whenever you want."],
       ["Can I borrow against my stocks?", "Yes. Borrow dollars against SpaceX, the S&P 500, Nvidia, Bitcoin and more, and pay back any time. Mofi lends up to half of what Kamino allows, so prices have room to fall."],
-      ["What does it cost?", `Buying, selling and gifting cost ${tradePct}%, and Mofi pays the network fee. Deposits and withdrawals have no Mofi fee. Private withdrawals add a small fee.`],
+      ["What does it cost?", `Mofi charges ${tradePct}% to buy, sell or gift. Regular deposits and withdrawals have no Mofi fee.`],
     ],
     finalTitle: "Your first share is",
     finalFaint: "a few dollars away",

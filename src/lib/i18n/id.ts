@@ -419,7 +419,7 @@ export const id: Messages = {
       ["Apa fungsi Privat?", "Penarikanmu dikirim sehingga tidak ada yang bisa mengaitkan alamat tujuan dengan dompet Mofi kamu. Biayanya sedikit lebih mahal, dan Mofi menunjukkan berapa persisnya."],
       ["Apakah saldoku menghasilkan bunga?", "Saldo yang kamu pindahkan ke Earn dipinjamkan lewat Kamino dan menghasilkan bunga setiap detik. Bunganya berubah sesuai permintaan, dan kamu bisa memindahkannya kembali kapan saja."],
       ["Bisakah aku meminjam dengan jaminan saham?", "Bisa. Pinjam dolar dengan jaminan SpaceX, S&P 500, Nvidia, Bitcoin, dan lainnya, lalu lunasi kapan saja. Mofi meminjamkan paling banyak setengah dari batas Kamino, jadi harga masih punya ruang untuk turun."],
-      ["Berapa biayanya?", `Biaya beli, jual, dan hadiah ${String(tradePct).replace(".", ",")}%, dan biaya jaringannya ditanggung Mofi. Deposit dan penarikan tanpa biaya Mofi. Penarikan privat ada tambahan biaya kecil.`],
+      ["Berapa biayanya?", `Mofi mengenakan ${String(tradePct).replace(".", ",")}% untuk beli, jual, atau hadiah. Deposit dan penarikan biasa tanpa biaya Mofi.`],
     ],
     finalTitle: "Saham pertamamu",
     finalFaint: "tinggal beberapa dolar lagi",
