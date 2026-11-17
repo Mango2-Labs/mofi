@@ -18,9 +18,11 @@ export const isFree = async (name: string) => USERNAME.test(name) && !RESERVED.h
 export async function claim(wallet: string, name: string) {
   if (!kvReady()) throw new UsernameError("Usernames aren't set up yet.");
   if (!USERNAME.test(name)) throw new UsernameError("Use 3 to 20 letters, numbers or underscores.");
-  if (RESERVED.has(name) || !(await kvSetNew(byName(name), wallet))) throw new UsernameError("That username is taken.");
+  // The name counts as free for the wallet that already holds it: an earlier try that stopped halfway.
+  if (RESERVED.has(name) || (!(await kvSetNew(byName(name), wallet)) && (await kvGet(byName(name))) !== wallet)) throw new UsernameError("That username is taken.");
   if (await kvSetNew(byWallet(wallet), name)) return name;
-  // This wallet already had one: give the new name back and keep the old.
-  await kvRun([["DEL", byName(name)]]);
-  return (await kvGet(byWallet(wallet))) ?? name;
+  // This wallet already had one: give the new name back (unless it's the same) and keep the old.
+  const current = (await kvGet(byWallet(wallet))) ?? name;
+  if (current !== name) await kvRun([["DEL", byName(name)]]);
+  return current;
 }

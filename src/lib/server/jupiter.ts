@@ -73,9 +73,9 @@ const NO_PRICE = "Couldn't get a price right now. Try a different amount.";
 // The most the fee wallet pays per compute unit, in micro-lamports, however busy Jupiter says the network is.
 const MAX_UNIT_PRICE = BigInt(500_000);
 const MAX_UNITS = 1_400_000;
+// What the fee wallet needs, in lamports, to pay one trade's fee and open the accounts it may need.
+const MIN_FEE_WALLET = 5_000_000;
 const ASSOCIATED_TOKEN_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
-// Inviters' cash accounts known to be open. Cash accounts never close, so once seen is enough.
-const cashAccounts = new Set<string>();
 // Jupiter's own error for a wallet that doesn't hold what the swap spends.
 const INSUFFICIENT_FUNDS = 6024;
 
@@ -127,8 +127,7 @@ export async function build({
   const exists = async (account: string) => !!(await rpc<{ value: object | null }>("getAccountInfo", [account, { encoding: "base64", dataSlice: { offset: 0, length: 0 } }])).value;
 
   const reward = inviter ? await usdcAccount(inviter) : null;
-  const rewarded = !!reward && (cashAccounts.has(reward) || (await exists(reward)));
-  if (rewarded) cashAccounts.add(reward);
+  const rewarded = !!reward && (await exists(reward));
   const share = (amount: bigint, of: number) => (amount * BigInt(INVITER_BPS)) / BigInt(of);
   // On a buy the inviter's share comes off the cash before the swap; on a sale, off what the swap brings in.
   const buying = params.inputMint === USDC_MINT;
@@ -157,7 +156,7 @@ export async function build({
   }
   const closer = createNoopSigner(address(payer.address));
   const programOf = (programId: string) => ({ programAddress: address(programId) }) as { programAddress: Address<never> };
-  // The user's own account for what's bought, when the swap opens it (if it isn't open yet).
+  // The user's own account for what's bought, which the swap opens if it isn't open yet.
   const bought = b.setupInstructions.find((ix) => ix.programId === ASSOCIATED_TOKEN_PROGRAM && ix.accounts[2]?.pubkey === params.taker && ix.accounts[3]?.pubkey === params.outputMint);
   const optional: Instruction[] = [];
 
@@ -174,10 +173,10 @@ export async function build({
       instructions.push(getCloseAccountInstruction({ account, destination: closer.address, owner }, programOf(bought.accounts[5].pubkey)));
     }
   } else if (bought && params.outputMint !== SOL_MINT && params.outputMint !== USDC_MINT) {
-    // Only the fee wallet can close the account from here on, so the rent it paid can only come back to it.
-    // Not the cash account, though: that one stays open for good, for deposits to land in.
-    const { value } = await rpc<{ value: { data: { parsed?: { info?: { closeAuthority?: string } } } } | null }>("getAccountInfo", [bought.accounts[1].pubkey, { encoding: "jsonParsed" }]);
-    if (!value?.data.parsed?.info?.closeAuthority) {
+    // When this trade opens the account, only the fee wallet can close it from here on, so the rent it paid can
+    // only come back to it. An account that was already open is left as it is: someone else may have paid for it.
+    // Not the cash account either: that one stays open for good, for deposits to land in.
+    if (!(await exists(bought.accounts[1].pubkey))) {
       optional.push(getSetAuthorityInstruction({ owned: address(bought.accounts[1].pubkey), owner, authorityType: AuthorityType.CloseAccount, newAuthority: closer.address }, programOf(bought.accounts[5].pubkey)));
     }
   }
@@ -232,7 +231,10 @@ export async function build({
   if (!sim) throw new JupiterError(NO_PRICE);
   if (sim.err) {
     const short = JSON.stringify(sim.err).includes(`"Custom":${INSUFFICIENT_FUNDS}`) || sim.logs?.some((l) => l.includes("insufficient funds"));
-    throw short ? new ShortError(NO_PRICE) : new JupiterError(NO_PRICE);
+    if (short) throw new ShortError(NO_PRICE);
+    // If the fee wallet can't cover a trade's fee and rent, that's why it failed, and no amount would work.
+    const { value: funds } = await rpc<{ value: number }>("getBalance", [payer.address]).catch(() => ({ value: MIN_FEE_WALLET }));
+    throw new JupiterError(funds < MIN_FEE_WALLET ? "Trading is paused for a moment. Try again soon." : NO_PRICE);
   }
 
   const transaction = await partiallySignTransaction([payer.keyPair], compile(Math.min(Math.ceil((sim.unitsConsumed ?? MAX_UNITS) * 1.2), MAX_UNITS), all));

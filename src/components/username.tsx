@@ -8,38 +8,41 @@ import { Wordmark } from "@/components/logo";
 import { postJson } from "@/lib/api";
 import { USERNAME, cleanUsername } from "@/lib/username";
 
-// Usernames already looked up in this visit, by wallet. null is a wallet known to have none.
+// Usernames already looked up in this visit, by wallet. null is a wallet that goes without one: usernames aren't set
+// up, or the lookup failed. A wallet that still has to pick one isn't in here.
 const known = new Map<string, string | null>();
 
 export const usernameOf = (wallet: string | undefined) => (wallet ? known.get(wallet) ?? null : null);
 
 // Every account picks a username before using the app. If the check can't be made, nobody is held up.
 export function Named({ wallet, email, children }: { wallet: string | undefined; email: string | undefined; children: ReactNode }) {
-  const [checked, setChecked] = useState<{ wallet: string; needed: boolean } | null>(null);
+  // Which wallet has been looked up and found to need a username. Setting it also redraws once `known` has changed.
+  const [needs, setNeeds] = useState<{ wallet: string; needed: boolean } | null>(null);
   useEffect(() => {
-    if (!wallet || known.get(wallet)) return;
+    if (!wallet || known.has(wallet)) return;
     let live = true;
     fetch(`/api/username?wallet=${wallet}`)
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
       .then((data: { username: string | null; ready: boolean } | null) => {
-        if (data?.username) known.set(wallet, data.username);
-        if (live) setChecked({ wallet, needed: !!data?.ready && !data.username });
+        const needed = !!data?.ready && !data.username;
+        if (!needed) known.set(wallet, data?.username ?? null);
+        if (live) setNeeds({ wallet, needed });
       });
     return () => { live = false; };
   }, [wallet]);
 
   if (!wallet) return children;
   if (known.get(wallet)) return <>{children}<InviteCodePrompt wallet={wallet} /></>;
-  if (checked?.wallet !== wallet) return <div className="m-auto"><Wordmark width={72} /></div>;
-  if (!checked.needed) return children;
+  if (known.has(wallet)) return children;
+  if (needs?.wallet !== wallet) return <div className="m-auto"><Wordmark width={72} /></div>;
   return (
     <PickUsername
       wallet={wallet}
       suggestion={cleanUsername(email?.split("@")[0] ?? "")}
       onPicked={(username) => {
         known.set(wallet, username);
-        setChecked({ wallet, needed: false });
+        setNeeds({ wallet, needed: false });
       }}
     />
   );

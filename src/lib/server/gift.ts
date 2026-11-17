@@ -157,7 +157,7 @@ export async function giftHoldings(gift: string) {
 // returning their rent to the fee wallet that opened them. The fee wallet pays and signs (and closes, where it's the
 // account's closer); the link's key signs the transfers after, in the claimer's browser, so the server never sees it.
 //
-// The fee wallet also pays to open the claimer's own accounts, so it becomes their only closer, the same as for an
+// The fee wallet also pays to open the claimer's own accounts, so it becomes the only closer of the ones it opens, as for an
 // account a buy opens (see build in lib/server/jupiter.ts). The claimer's wallet has to sign for that (`sign`). If
 // that wouldn't fit or wouldn't go through, the claim is built without it, so it never stands in the way of a gift.
 export async function buildClaim(gift: string, to: string) {
@@ -168,9 +168,10 @@ export async function buildClaim(gift: string, to: string) {
   const owner = createNoopSigner(address(gift));
   const claimer = createNoopSigner(address(to));
   const accounts = await Promise.all(held.map(async (h) => (await findAssociatedTokenPda({ owner: claimer.address, mint: address(h.account.data.parsed.info.mint), tokenProgram: address(h.programId) }))[0]));
-  const { value: existing } = await rpc<{ value: ({ data: { parsed?: { info?: { closeAuthority?: string } } } } | null)[] }>("getMultipleAccounts", [accounts, { encoding: "jsonParsed" }]);
+  const { value: existing } = await rpc<{ value: (object | null)[] }>("getMultipleAccounts", [accounts, { encoding: "base64", dataSlice: { offset: 0, length: 0 } }]);
+  // Only accounts this claim opens are locked: one that was already open may have been paid for by someone else.
   // Cash accounts stay open for good, so they're never locked.
-  const lockable = held.map((h, i) => h.account.data.parsed.info.mint !== USDC_MINT && !existing[i]?.data.parsed?.info?.closeAuthority);
+  const lockable = held.map((h, i) => h.account.data.parsed.info.mint !== USDC_MINT && !existing[i]);
 
   const assemble = (lock: boolean) => {
     const instructions: Instruction[] = [getSetComputeUnitLimitInstruction({ units: 60_000 * held.length + 20_000 }), getSetComputeUnitPriceInstruction({ microLamports: 100_000 })];

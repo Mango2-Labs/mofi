@@ -333,7 +333,7 @@ export const en = {
     todayLabel: "Today",
     yesterday: "Yesterday",
     empty: "Nothing yet. Deposits, buys and withdrawals show up here.",
-    kind: { deposit: "Deposit", withdraw: "Withdrawal", buy: "Buy", sell: "Sell", receive: "Received", gift: "Gift", earn: "Earn", loan: "Loan" },
+    kind: { deposit: "Deposit", withdraw: "Withdrawal", buy: "Buy", sell: "Sell", receive: "Received", gift: "Gift", earn: "Earn", loan: "Loan", reward: "Invite" },
     action: {
       toEarn: () => "Moved to Earn",
       toCash: () => "Moved to cash",
@@ -345,6 +345,7 @@ export const en = {
       gifted: (name: string) => `Gifted ${name}`,
       withdrew: () => "Withdrew",
       deposited: () => "Deposited",
+      rewarded: () => "Referral reward",
     },
   },
 

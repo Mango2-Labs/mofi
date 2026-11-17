@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
 import { INVITE_KEY as KEY } from "@/lib/invite";
-import { USERNAME } from "@/lib/username";
+import { USERNAME, cleanUsername } from "@/lib/username";
 
 // `username` is the inviter's.
 export const inviteLink = (username: string) => `${location.origin}/r/${username}`;
@@ -14,8 +14,10 @@ export const inviteLink = (username: string) => `${location.origin}/r/${username
 export function InviteCapture() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const by = params.get("ref");
-    if (by === null) return;
+    const typed = params.get("ref");
+    if (typed === null) return;
+    // However the link was typed (capitals, say), it's read the way a username is written.
+    const by = cleanUsername(typed);
     try {
       if (USERNAME.test(by)) localStorage.setItem(KEY, by);
     } catch {}
@@ -36,12 +38,23 @@ export function InviteJoin() {
       by = localStorage.getItem(KEY);
     } catch {}
     if (!by) return;
-    postJson("/api/referral", { wallet: address, by }).then(
-      (res) => {
-        if (res.ok || res.status === 400) localStorage.removeItem(KEY);
-      },
-      () => {},
-    );
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // A brand-new wallet can be refused for a moment (the sign-in service hasn't listed it yet), and a new account
+    // can only join before its first deposit, so a failed try is repeated a few times straight away.
+    const waits = [2_000, 5_000, 15_000, 30_000];
+    const attempt = () =>
+      postJson("/api/referral", { wallet: address, by })
+        .then((res) => res.ok || res.status === 400, () => false)
+        .then((settled) => {
+          if (settled) localStorage.removeItem(KEY);
+          else if (live && waits.length) timer = setTimeout(attempt, waits.shift());
+        });
+    attempt();
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
   }, [address]);
   return null;
 }

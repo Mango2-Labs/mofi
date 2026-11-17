@@ -3,6 +3,7 @@ import { EARN_SHARES_MINT } from "@/lib/server/earn";
 import { SOL_MINT, TOKEN_PROGRAMS, rpc } from "@/lib/server/portfolio";
 
 const KLEND = "KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD";
+const JUPITER = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
 
 type Balance = { accountIndex: number; owner?: string; mint: string; uiTokenAmount: { uiAmountString: string } };
 type Tx = {
@@ -13,8 +14,8 @@ type Tx = {
 // amount is the change in the user's cash, in dollars: negative when money left it. logo is the asset's, for buys and sells.
 // `action` is what happened, which the app names in the reader's language; `name` is the asset it happened to.
 export type Activity = { signature: string; time: number; kind: Kind; action: Action; amount: number; name?: string; symbol?: string; logo?: string };
-export type Kind = "deposit" | "withdraw" | "buy" | "sell" | "receive" | "gift" | "earn" | "loan";
-export type Action = "toEarn" | "toCash" | "borrowed" | "repaid" | "bought" | "sold" | "received" | "gifted" | "withdrew" | "deposited";
+export type Kind = "deposit" | "withdraw" | "buy" | "sell" | "receive" | "gift" | "earn" | "loan" | "reward";
+export type Action = "toEarn" | "toCash" | "borrowed" | "repaid" | "bought" | "sold" | "received" | "gifted" | "withdrew" | "deposited" | "rewarded";
 
 type Sig = { signature: string; blockTime: number; err: unknown };
 type TokenAccounts = { value: { pubkey: string; account: { data: { parsed: { info: { mint: string } } } } }[] };
@@ -53,6 +54,8 @@ export async function activity(owner: string): Promise<Activity[]> {
       if (asset) return cash < 0 ? ["buy", "bought"] : cash > 0 ? ["sell", "sold"] : ["receive", "received"];
       if (gifted && cash < 0) return ["gift", "gifted"];
       if (cash < 0) return ["withdraw", "withdrew"];
+      // Cash that arrived inside someone else's swap is the user's share of an invited friend's fee.
+      if (cash > 0 && i < 0 && keys.includes(JUPITER)) return ["reward", "rewarded"];
       if (cash > 0) return ["deposit", "deposited"];
       return null;
     })();

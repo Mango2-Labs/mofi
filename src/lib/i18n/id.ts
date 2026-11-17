@@ -54,6 +54,7 @@ const SERVER: Record<string, string> = {
   "Investing isn't set up yet.": "Investasi belum tersedia.",
   "Couldn't reach Jupiter. Try again in a moment.": "Jupiter tidak bisa dihubungi. Coba lagi sebentar lagi.",
   "That username is taken.": "Username itu sudah dipakai.",
+  "Trading is paused for a moment. Try again soon.": "Trading dijeda sebentar. Coba lagi nanti.",
   "Use 3 to 20 letters, numbers or underscores.": "Pakai 3 sampai 20 huruf, angka, atau garis bawah.",
   "Couldn't save that right now. Try again.": "Belum bisa disimpan. Coba lagi.",
   "This can't be gifted right now.": "Ini belum bisa dihadiahkan sekarang.",
@@ -417,7 +418,7 @@ export const id: Messages = {
     todayLabel: "Hari ini",
     yesterday: "Kemarin",
     empty: "Belum ada. Deposit, pembelian, dan penarikan muncul di sini.",
-    kind: { deposit: "Deposit", withdraw: "Penarikan", buy: "Beli", sell: "Jual", receive: "Diterima", gift: "Hadiah", earn: "Earn", loan: "Pinjaman" },
+    kind: { deposit: "Deposit", withdraw: "Penarikan", buy: "Beli", sell: "Jual", receive: "Diterima", gift: "Hadiah", earn: "Earn", loan: "Pinjaman", reward: "Undangan" },
     action: {
       toEarn: () => "Dipindahkan ke Earn",
       toCash: () => "Dipindahkan ke saldo",
@@ -429,6 +430,7 @@ export const id: Messages = {
       gifted: (name) => `Menghadiahkan ${name}`,
       withdrew: () => "Menarik dana",
       deposited: () => "Deposit masuk",
+      rewarded: () => "Hadiah referral",
     },
   },
 
