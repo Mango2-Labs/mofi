@@ -3,9 +3,8 @@
 import { useEffect } from "react";
 import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
+import { INVITE_KEY as KEY } from "@/lib/invite";
 import { USERNAME } from "@/lib/username";
-
-const KEY = "mofi:invite";
 
 // `username` is the inviter's.
 export const inviteLink = (username: string) => `${location.origin}/r/${username}`;

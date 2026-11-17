@@ -22,12 +22,16 @@ export async function inviterOf(wallet: string) {
   return found.get(wallet)!;
 }
 
-// Ties a wallet to its inviter. Only a wallet that has never done anything can join, so an invite is for new
-// accounts, and only once. Says whether it joined.
+// Whether a wallet could still be tied to an inviter: only one that has never done anything, so an invite is for
+// new accounts.
+export async function canJoin(wallet: string) {
+  if (!kvReady()) return false;
+  return !(await rpc<unknown[]>("getSignaturesForAddress", [wallet, { limit: 1 }])).length;
+}
+
+// Ties a wallet to its inviter, once. Says whether it joined.
 export async function join(wallet: string, by: string) {
-  if (!kvReady() || by === wallet) return false;
-  const history = await rpc<unknown[]>("getSignaturesForAddress", [wallet, { limit: 1 }]);
-  if (history.length) return false;
+  if (by === wallet || !(await canJoin(wallet))) return false;
   if (!(await kvSetNew(key(wallet), JSON.stringify({ by, at: Date.now() } satisfies Invite)))) return false;
   await kvRun([["SADD", `invited:${by}`, wallet]]);
   return true;

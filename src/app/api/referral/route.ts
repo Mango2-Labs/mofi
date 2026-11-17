@@ -3,13 +3,14 @@ import { INVITED_FEE_BPS, TRADE_FEE_BPS } from "@/lib/fees";
 import { guard } from "@/lib/server/auth";
 import { usdcAccount } from "@/lib/server/fee-payer";
 import { rpc } from "@/lib/server/portfolio";
-import { inviterOf, join, rewards } from "@/lib/server/referral";
+import { canJoin, inviterOf, join, rewards } from "@/lib/server/referral";
 import { walletOf } from "@/lib/server/username";
 
 const fail = (message: string, status = 400) => Response.json({ error: message }, { status });
 
 // What a wallet pays to trade: the invited fee if a friend invited it, the standard fee otherwise. With `rewards`,
 // also what it has earned by inviting friends, and whether it has a cash account for those earnings to land in.
+// With `ask`, whether it could still use a friend's invite code.
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const wallet = searchParams.get("wallet") ?? "";
@@ -17,6 +18,7 @@ export async function GET(req: Request) {
   try {
     const invited = !!(await inviterOf(wallet));
     const fee = { invited, feeBps: invited ? INVITED_FEE_BPS : TRADE_FEE_BPS };
+    if (searchParams.has("ask")) return Response.json({ ...fee, eligible: !invited && (await canJoin(wallet)) });
     if (!searchParams.has("rewards")) return Response.json(fee);
     const [earned, cash] = await Promise.all([
       rewards(wallet),

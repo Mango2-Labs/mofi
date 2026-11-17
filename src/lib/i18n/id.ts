@@ -382,6 +382,22 @@ export const id: Messages = {
     failed: "Belum bisa disimpan. Coba lagi.",
   },
 
+  inviteCode: {
+    title: "Punya kode referral?",
+    before: "Masukkan kode referral untuk dapat ",
+    discount: (off) => `diskon ${off}% di setiap transaksi`,
+    after: ".",
+    label: "Kode referral",
+    placeholder: "namateman",
+    apply: "Pakai kode",
+    skip: "Lewati",
+    unknown: "Kode referral itu tidak ada.",
+    unusable: "Kode ini tidak bisa dipakai di akun ini.",
+    failed: "Belum bisa dipakai sekarang. Coba lagi.",
+    doneTitle: "Diskon aktif",
+    doneText: (off) => `Kamu bayar ${off}% lebih murah di setiap transaksi.`,
+  },
+
   rewards: {
     title: "Ajak teman",
     headline: (off) => `Teman dapat diskon biaya ${off}%.`,

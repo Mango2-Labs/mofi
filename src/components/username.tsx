@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Field } from "@/components/field";
+import { UsernameField } from "@/components/field";
+import { InviteCodePrompt } from "@/components/invite-code";
 import { useT } from "@/components/language";
 import { Wordmark } from "@/components/logo";
 import { postJson } from "@/lib/api";
@@ -28,7 +29,8 @@ export function Named({ wallet, email, children }: { wallet: string | undefined;
     return () => { live = false; };
   }, [wallet]);
 
-  if (!wallet || known.get(wallet)) return children;
+  if (!wallet) return children;
+  if (known.get(wallet)) return <>{children}<InviteCodePrompt wallet={wallet} /></>;
   if (checked?.wallet !== wallet) return <div className="m-auto"><Wordmark width={72} /></div>;
   if (!checked.needed) return children;
   return (
@@ -93,9 +95,14 @@ function PickUsername({ wallet, suggestion, onPicked }: { wallet: string; sugges
         <h1 className="text-[28px] leading-tight font-semibold tracking-[-0.03em]">{t.username.title}</h1>
         <p className="text-ink-muted">{t.username.text}</p>
       </div>
-      <Field
+      <UsernameField
         id="username"
         label={t.username.label}
+        value={name}
+        onChange={(e) => { setName(cleanUsername(e.target.value)); setError(null); }}
+        maxLength={20}
+        aria-invalid={!!error || checked === false}
+        placeholder={t.username.placeholder}
         hint={
           error ? <span role="alert" className="text-loss">{error}</span>
           : !valid ? t.username.rules
@@ -103,23 +110,7 @@ function PickUsername({ wallet, suggestion, onPicked }: { wallet: string; sugges
           : checked ? <span className="text-gain">{t.username.free}</span>
           : t.username.checking
         }
-      >
-        <input
-          id="username"
-          name="username"
-          type="text"
-          value={name}
-          onChange={(e) => { setName(cleanUsername(e.target.value)); setError(null); }}
-          autoComplete="off"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          maxLength={20}
-          aria-invalid={!!error || checked === false}
-          className="w-full bg-transparent text-lg font-semibold outline-none placeholder:text-ink-faint"
-          placeholder={t.username.placeholder}
-        />
-      </Field>
+      />
       <button type="submit" disabled={!valid || checked === false || busy} className="w-full cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
         {busy ? t.common.loading : t.username.save}
       </button>

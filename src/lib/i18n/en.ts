@@ -297,6 +297,23 @@ export const en = {
     failed: "Couldn't save that right now. Try again.",
   },
 
+  inviteCode: {
+    title: "Got a referral code?",
+    // One sentence, with the discount picked out in bold.
+    before: "Enter a referral code to get a ",
+    discount: (off: number) => `${off}% discount on every trade`,
+    after: ".",
+    label: "Referral code",
+    placeholder: "friendname",
+    apply: "Apply code",
+    skip: "Skip",
+    unknown: "That referral code doesn't exist.",
+    unusable: "This code can't be used on this account.",
+    failed: "Couldn't apply that right now. Try again.",
+    doneTitle: "Discount applied",
+    doneText: (off: number) => `You'll pay ${off}% less on every trade.`,
+  },
+
   rewards: {
     title: "Invite friends",
     headline: (off: number) => `Friends get ${off}% off fees.`,
