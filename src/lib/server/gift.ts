@@ -38,9 +38,9 @@ type Holding = {
   };
 };
 
-// A claim fits about five tokens in one transaction; anything beyond (dust someone sent to the gift wallet, say) is
-// left for the next claim, so it can never block the gift.
-const PER_CLAIM = 5;
+// A claim moves three tokens in one transaction, which leaves room to lock each account it opens (see buildClaim);
+// anything beyond (dust someone sent to the gift wallet, say) is left for the next claim, so it can never block the gift.
+const PER_CLAIM = 3;
 
 const programOf = (programId: string) => ({ programAddress: address(programId) }) as { programAddress: Address<never> };
 
@@ -55,7 +55,7 @@ async function mintProgram(mint: string) {
   return programs.get(mint)!;
 }
 
-const giftAccount = async (gift: string, mint: string) => (await findAssociatedTokenPda({ owner: address(gift), mint: address(mint), tokenProgram: address(await mintProgram(mint)) }))[0];
+export const giftAccount = async (gift: string, mint: string) => (await findAssociatedTokenPda({ owner: address(gift), mint: address(mint), tokenProgram: address(await mintProgram(mint)) }))[0];
 
 // Signs as the fee wallet (fee payer) and simulates, so anything that would fail does so here and not after signing.
 async function finish(instructions: Instruction[], payer: TransactionSigner, failure: string) {
@@ -102,8 +102,9 @@ export async function giftReady(gift: string, mint: string) {
 
 type ParsedIx = { parsed?: { type?: string; info?: { account?: string; authorityType?: string; newAuthority?: string } } };
 
-// Empty token accounts the fee wallet is the closer of: gift accounts prepared but never bought into, or emptied by a
-// link holder outside Mofi. Closing them returns their rent to the fee wallet. They're found from the fee wallet's
+// Empty token accounts the fee wallet is the closer of: gift accounts prepared but never bought into or emptied by a
+// link holder outside Mofi, and accounts a buy opened (see build in lib/server/jupiter.ts) that were emptied without a
+// sale. Closing them returns their rent to the fee wallet. They're found from the fee wallet's
 // recent prepare transactions (the RPC blocks a search across all token accounts), a few at a time so one
 // transaction always fits.
 export async function sweepGiftAccounts({ send = false } = {}) {
@@ -125,7 +126,8 @@ export async function sweepGiftAccounts({ send = false } = {}) {
     .map((pubkey, i) => ({ pubkey, programId: value[i]?.owner ?? "", account: value[i] && { data: value[i]!.data } }))
     .filter((a): a is { pubkey: string; programId: string; account: Holding["account"] } => {
       const info = a.account?.data.parsed?.info;
-      return !!info && info.tokenAmount.amount === "0" && info.closeAuthority === payer.address;
+      // Never a cash account: it stays open for deposits, even when empty.
+      return !!info && info.mint !== USDC_MINT && info.tokenAmount.amount === "0" && info.closeAuthority === payer.address;
     })
     .slice(0, 8);
   if (!found.length) return { closed: 0 };
@@ -154,27 +156,46 @@ export async function giftHoldings(gift: string) {
 // A claim: everything in a gift wallet moves to the claimer's Mofi wallet, and the gift wallet's token accounts close,
 // returning their rent to the fee wallet that opened them. The fee wallet pays and signs (and closes, where it's the
 // account's closer); the link's key signs the transfers after, in the claimer's browser, so the server never sees it.
+//
+// The fee wallet also pays to open the claimer's own accounts, so it becomes the only closer of the ones it opens, as for an
+// account a buy opens (see build in lib/server/jupiter.ts). The claimer's wallet has to sign for that (`sign`). If
+// that wouldn't fit or wouldn't go through, the claim is built without it, so it never stands in the way of a gift.
 export async function buildClaim(gift: string, to: string) {
   const [payer, all] = await Promise.all([feeSigner(), giftHoldings(gift)]);
   if (!all.length) throw new GiftError("This gift has already been claimed.");
   const held = all.slice(0, PER_CLAIM);
 
   const owner = createNoopSigner(address(gift));
-  const instructions: Instruction[] = [getSetComputeUnitLimitInstruction({ units: 60_000 * held.length + 20_000 }), getSetComputeUnitPriceInstruction({ microLamports: 100_000 })];
-  for (const h of held) {
-    const { mint, tokenAmount, extensions, closeAuthority } = h.account.data.parsed.info;
-    const program = programOf(h.programId);
-    const [ata] = await findAssociatedTokenPda({ owner: address(to), mint: address(mint), tokenProgram: address(h.programId) });
-    instructions.push(
-      getCreateAssociatedTokenIdempotentInstruction({ payer, ata, owner: address(to), mint: address(mint), tokenProgram: address(h.programId) }),
-      getTransferCheckedInstruction({ source: address(h.pubkey), mint: address(mint), destination: ata, authority: owner, amount: BigInt(tokenAmount.amount), decimals: tokenAmount.decimals }, program),
-    );
-    // Tokens with a transfer fee (OpenAI and Anthropic, for example) keep fees withheld in the account, and it can't
-    // close until they're swept to the mint.
-    if (extensions?.some((e) => e.extension === "transferFeeAmount")) {
-      instructions.push(getHarvestWithheldTokensToMintInstruction({ mint: address(mint), sources: [address(h.pubkey)] }, program));
-    }
-    instructions.push(getCloseAccountInstruction({ account: address(h.pubkey), destination: payer.address, owner: closeAuthority === payer.address ? payer : owner }, program));
+  const claimer = createNoopSigner(address(to));
+  const accounts = await Promise.all(held.map(async (h) => (await findAssociatedTokenPda({ owner: claimer.address, mint: address(h.account.data.parsed.info.mint), tokenProgram: address(h.programId) }))[0]));
+  const { value: existing } = await rpc<{ value: (object | null)[] }>("getMultipleAccounts", [accounts, { encoding: "base64", dataSlice: { offset: 0, length: 0 } }]);
+  // Only accounts this claim opens are locked: one that was already open may have been paid for by someone else.
+  // Cash accounts stay open for good, so they're never locked.
+  const lockable = held.map((h, i) => h.account.data.parsed.info.mint !== USDC_MINT && !existing[i]);
+
+  const assemble = (lock: boolean) => {
+    const instructions: Instruction[] = [getSetComputeUnitLimitInstruction({ units: 60_000 * held.length + 20_000 }), getSetComputeUnitPriceInstruction({ microLamports: 100_000 })];
+    held.forEach((h, i) => {
+      const { mint, tokenAmount, extensions, closeAuthority } = h.account.data.parsed.info;
+      const program = programOf(h.programId);
+      instructions.push(getCreateAssociatedTokenIdempotentInstruction({ payer, ata: accounts[i], owner: claimer.address, mint: address(mint), tokenProgram: address(h.programId) }));
+      if (lock && lockable[i]) {
+        instructions.push(getSetAuthorityInstruction({ owned: accounts[i], owner: claimer, authorityType: AuthorityType.CloseAccount, newAuthority: payer.address }, program));
+      }
+      instructions.push(getTransferCheckedInstruction({ source: address(h.pubkey), mint: address(mint), destination: accounts[i], authority: owner, amount: BigInt(tokenAmount.amount), decimals: tokenAmount.decimals }, program));
+      // Tokens with a transfer fee (OpenAI and Anthropic, for example) keep fees withheld in the account, and it can't
+      // close until they're swept to the mint.
+      if (extensions?.some((e) => e.extension === "transferFeeAmount")) {
+        instructions.push(getHarvestWithheldTokensToMintInstruction({ mint: address(mint), sources: [address(h.pubkey)] }, program));
+      }
+      instructions.push(getCloseAccountInstruction({ account: address(h.pubkey), destination: payer.address, owner: closeAuthority === payer.address ? payer : owner }, program));
+    });
+    return instructions;
+  };
+  const failure = "This gift can't be claimed right now. Try again later.";
+  if (lockable.some(Boolean)) {
+    const transaction = await finish(assemble(true), payer, failure).catch(() => null);
+    if (transaction) return { transaction, sign: true };
   }
-  return finish(instructions, payer, "This gift can't be claimed right now. Try again later.");
+  return { transaction: await finish(assemble(false), payer, failure), sign: false };
 }

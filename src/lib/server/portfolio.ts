@@ -17,7 +17,16 @@ export async function rpc<T>(method: string, params: unknown[]): Promise<T> {
   return data.result;
 }
 
-type TokenAccounts = { value: { account: { data: { parsed: { info: { mint: string; tokenAmount: { amount: string; uiAmountString: string } } } } } }[] };
+type TokenAccounts = {
+  value: {
+    pubkey: string;
+    account: { owner: string; data: { parsed: { info: { mint: string; closeAuthority?: string; tokenAmount: { amount: string; uiAmountString: string }; extensions?: { extension: string }[] } } } };
+  }[];
+};
+
+// One token account: its token program, who besides its owner may close it, and whether it withholds transfer fees
+// (which must be swept to the mint before it can close).
+export type TokenAccount = { account: string; program: string; closeAuthority?: string; withholds: boolean };
 
 export type Holding = { symbol: string; name: string; mint: string; amount: number; value: number; change: number; logo: string };
 
@@ -53,17 +62,23 @@ export async function portfolio(owner: string) {
   return { cash, earn, holdings, total: cash + earn + holdings.reduce((sum, h) => sum + h.value, 0) };
 }
 
-// What a wallet can sell of one asset, in base units, and what it's worth in UI units.
+// What a wallet can sell of one asset, in base units, what it's worth in UI units, and the token accounts holding it.
 // SOL keeps 0.01 back, because a wallet holding SOL pays its own network fees.
-export async function balanceOf(owner: string, mint: string) {
+export async function balanceOf(owner: string, mint: string): Promise<{ raw: bigint; ui: number; accounts: TokenAccount[] }> {
   if (mint === SOL_MINT) {
     const { value } = await rpc<{ value: number }>("getBalance", [owner]);
     const raw = BigInt(Math.max(0, value - 10_000_000));
-    return { raw, ui: Number(raw) / 1e9 };
+    return { raw, ui: Number(raw) / 1e9, accounts: [] };
   }
   const { value } = await rpc<TokenAccounts>("getTokenAccountsByOwner", [owner, { mint }, { encoding: "jsonParsed" }]);
-  return value.reduce(
-    (sum, { account }) => ({ raw: sum.raw + BigInt(account.data.parsed.info.tokenAmount.amount), ui: sum.ui + Number(account.data.parsed.info.tokenAmount.uiAmountString) }),
-    { raw: BigInt(0), ui: 0 },
-  );
+  return {
+    raw: value.reduce((sum, { account }) => sum + BigInt(account.data.parsed.info.tokenAmount.amount), BigInt(0)),
+    ui: value.reduce((sum, { account }) => sum + Number(account.data.parsed.info.tokenAmount.uiAmountString), 0),
+    accounts: value.map(({ pubkey, account }) => ({
+      account: pubkey,
+      program: account.owner,
+      closeAuthority: account.data.parsed.info.closeAuthority,
+      withholds: !!account.data.parsed.info.extensions?.some((e) => e.extension === "transferFeeAmount"),
+    })),
+  };
 }

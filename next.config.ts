@@ -4,6 +4,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Kamino's SDK reaches Orca code that reads a .wasm file from disk, which breaks when bundled.
   serverExternalPackages: ["@kamino-finance/klend-sdk", "@kamino-finance/scope-sdk"],
+  // An invite link, mofi…/r/username, opens the app, which remembers who sent it and then drops the ?ref from the
+  // address (see components/invite.tsx).
+  async redirects() {
+    return [{ source: "/r/:name", destination: "/app?ref=:name", permanent: false }];
+  },
   async headers() {
     return [
       {

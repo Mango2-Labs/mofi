@@ -2,6 +2,7 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 import type { ReactNode } from "react";
+import { InviteJoin } from "@/components/invite";
 import { useT } from "@/components/language";
 import { PendingBuyProvider } from "@/components/pending-buy";
 
@@ -17,6 +18,7 @@ export function Providers({ children }: { children: ReactNode }) {
         embeddedWallets: { solana: { createOnLogin: "users-without-wallets" }, ethereum: { createOnLogin: "off" }, showWalletUIs: false },
       }}
     >
+      <InviteJoin />
       <PendingBuyProvider>{children}</PendingBuyProvider>
     </PrivyProvider>
   );

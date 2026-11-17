@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { connection } from "next/server";
+import { InviteCapture } from "@/components/invite";
 import { LanguageProvider } from "@/components/language";
 import { getLang, getT } from "@/lib/i18n/server";
 import "./globals.css";
@@ -19,6 +20,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang={lang} className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
       <body>
+        <InviteCapture />
         <LanguageProvider initial={lang}>{children}</LanguageProvider>
       </body>
     </html>

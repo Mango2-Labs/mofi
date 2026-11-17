@@ -31,6 +31,7 @@ const BADGE: Record<Exclude<Kind, "buy" | "sell" | "receive" | "gift">, { icon: 
   withdraw: { icon: "rise", className: "bg-ink text-on-ink" },
   earn: { icon: "rise", className: "bg-gain text-white" },
   loan: { icon: "bank", className: "bg-surface-app text-ink" },
+  reward: { icon: "invite", className: "bg-gain-soft text-gain" },
 };
 
 // Recent transactions, newest first and grouped by day, each linked to Solscan.

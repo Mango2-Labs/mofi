@@ -5,7 +5,7 @@ import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
 import { fromBase64, toBase64 } from "@/lib/base64";
 
-export type Order = { transaction: string; requestId: string; feeBps: number; sponsored: boolean; cashOut: number | null; at: number };
+export type Order = { transaction: string; cashOut: number | null; at: number };
 
 // A message from Mofi's server that is safe to show as is.
 export class TradeError extends Error {}
@@ -28,7 +28,7 @@ export function useTrade() {
     order: async (side: "buy" | "sell", symbol: string, amount: string) => stamped(await post("/api/trade", { side, symbol, amount, taker: address })),
     execute: async (o: Order) => {
       const { signedTransaction } = await signTransaction({ transaction: fromBase64(o.transaction), wallet: wallet!, chain: "solana:mainnet" });
-      return (await post("/api/trade/execute", { signedTransaction: toBase64(signedTransaction), requestId: o.requestId })).signature as string;
+      return (await post("/api/send", { transaction: toBase64(signedTransaction) })).signature as string;
     },
   };
 }
