@@ -6,7 +6,7 @@ const token = () => process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_R
 export const kvReady = () => !!(url() && token());
 
 // Runs commands in one request. Errors never include the URL or token.
-async function run<T>(commands: (string | number)[][]): Promise<T[]> {
+export async function kvRun<T>(commands: (string | number)[][]): Promise<T[]> {
   const res = await fetch(`${url()}/pipeline`, {
     method: "POST",
     headers: { authorization: `Bearer ${token()}`, "content-type": "application/json" },
@@ -18,14 +18,16 @@ async function run<T>(commands: (string | number)[][]): Promise<T[]> {
   return data.map((d) => d.result as T);
 }
 
-export const kvGet = async (key: string) => (await run<string | null>([["GET", key]]))[0];
-export const kvSet = async (key: string, value: string) => void (await run([["SET", key, value]]));
+export const kvGet = async (key: string) => (await kvRun<string | null>([["GET", key]]))[0];
+export const kvSet = async (key: string, value: string) => void (await kvRun([["SET", key, value]]));
+// Sets `key` only if nothing is there yet, and says whether it did.
+export const kvSetNew = async (key: string, value: string) => (await kvRun<string | null>([["SET", key, value, "NX"]]))[0] === "OK";
 
 // Adds `member` to the set at `key` and returns how many it holds; the key expires `ttl` seconds after its last add.
-export const kvAdd = async (key: string, member: string, ttl: number) => (await run<number>([["SADD", key, member], ["EXPIRE", key, ttl], ["SCARD", key]]))[2];
+export const kvAdd = async (key: string, member: string, ttl: number) => (await kvRun<number>([["SADD", key, member], ["EXPIRE", key, ttl], ["SCARD", key]]))[2];
 
 // How many the set at `key` would hold once `member` (or a new member, for null) is added.
 export async function kvCountWith(key: string, member: string | null) {
-  const [has, count] = await run<number>([["SISMEMBER", key, member ?? ""], ["SCARD", key]]);
+  const [has, count] = await kvRun<number>([["SISMEMBER", key, member ?? ""], ["SCARD", key]]);
   return count + (member && has ? 0 : 1);
 }

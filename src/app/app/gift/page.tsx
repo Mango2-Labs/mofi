@@ -1,6 +1,7 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
+import { useSignTransaction } from "@privy-io/react-auth/solana";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useT } from "@/components/language";
@@ -8,6 +9,7 @@ import { Wordmark } from "@/components/logo";
 import { AssetRow, Card, Icon } from "@/components/phone";
 import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
+import { fromBase64, toBase64 } from "@/lib/base64";
 import { usd } from "@/lib/format";
 import { openGift, signWithGift } from "@/lib/gift-links";
 import { usePoll } from "@/lib/use-poll";
@@ -19,7 +21,8 @@ type Gift = Awaited<ReturnType<typeof openGift>>;
 // in the browser, and never goes to Mofi's server.
 export default function GiftPage() {
   const { ready, authenticated, login } = usePrivy();
-  const { address } = useMofiWallet();
+  const { address, wallet } = useMofiWallet();
+  const { signTransaction } = useSignTransaction();
   const t = useT();
   const [gift, setGift] = useState<Gift | null>(null);
   const [invalid, setInvalid] = useState(false);
@@ -42,14 +45,17 @@ export default function GiftPage() {
   }, []);
 
   async function claim() {
-    if (!gift || !address) return;
+    if (!gift || !address || !wallet) return;
     setBusy(true);
     setError(null);
     try {
       const res = await postJson("/api/gift/claim", { gift: gift.address, to: address });
       const data = await res.json();
       if (!res.ok) return setError(data.error);
-      const sent = await postJson("/api/send", { transaction: await signWithGift(gift.keyPair, data.transaction) });
+      let transaction = await signWithGift(gift.keyPair, data.transaction);
+      // The claimer's wallet signs too when the claim opens accounts for it, to make Mofi their only closer.
+      if (data.sign) transaction = toBase64((await signTransaction({ transaction: fromBase64(transaction), wallet: wallet!, chain: "solana:mainnet" })).signedTransaction);
+      const sent = await postJson("/api/send", { transaction });
       if (sent.ok) {
         // The link's key leaves the address bar and history once it's been used.
         history.replaceState(null, "", location.pathname);

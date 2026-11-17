@@ -10,12 +10,7 @@ import {
   createTransactionMessage,
   getAddressFromPublicKey,
   getBase58Encoder,
-  getBase64Decoder,
   getBase64EncodedWireTransaction,
-  getBase64Encoder,
-  getTransactionDecoder,
-  getTransactionEncoder,
-  partiallySignTransaction,
   partiallySignTransactionMessageWithSigners,
   pipe,
   setTransactionMessageFeePayerSigner,
@@ -26,7 +21,7 @@ import { USDC_MINT } from "@/lib/assets";
 import { rpc } from "@/lib/server/portfolio";
 
 // Mofi's fee wallet pays network fees and new-account rent, so users never need SOL.
-// It only signs transactions the server built or fetched from Jupiter itself, never one a client sends in.
+// It only signs transactions the server built itself, never one a client sends in.
 let wallet: Promise<{ keyPair: CryptoKeyPair; address: string }> | undefined;
 
 export function feeWallet() {
@@ -39,16 +34,8 @@ export function feeWallet() {
   return wallet;
 }
 
-// Adds the fee wallet's signature when the transaction needs it. The user's wallet signs after.
-export async function cosign(base64: string) {
-  const { keyPair, address: payer } = (await feeWallet())!;
-  const tx = getTransactionDecoder().decode(getBase64Encoder().encode(base64));
-  if (!(payer in tx.signatures)) return base64;
-  return getBase64Decoder().decode(getTransactionEncoder().encode(await partiallySignTransaction([keyPair], tx)));
-}
-
 // Mofi's revenue wallet. Aurora pays Mofi's share of its fees here too.
-const TREASURY = address("DRv86pCTqrEjkLMU9r6e8KiDihPBdLCbUk3Kyr213J5C");
+export const TREASURY = address("DRv86pCTqrEjkLMU9r6e8KiDihPBdLCbUk3Kyr213J5C");
 
 export const feeSigner = async () => createSignerFromKeyPair((await feeWallet())!.keyPair);
 

@@ -5,7 +5,8 @@ import { GiftError, buildClaim } from "@/lib/server/gift";
 
 const fail = (message: string, status = 400) => Response.json({ error: message }, { status });
 
-// The claim transaction for a gift link, for the claimer's browser to sign with the link's key.
+// The claim transaction for a gift link, for the claimer's browser to sign with the link's key, and with the
+// claimer's own wallet too when `sign` says so.
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const denied = await guard(req, { counted: true, wallet: String(body?.to ?? "") });
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
   // A claim moves everything out of the "gift" wallet, so it must never be the fee wallet.
   if (gift === (await feeWallet())?.address) return fail("This gift link isn't valid.");
   try {
-    return Response.json({ transaction: await buildClaim(gift, to) });
+    return Response.json(await buildClaim(gift, to));
   } catch (e) {
     return fail(e instanceof GiftError ? e.message : "Couldn't set up the claim. Try again.", e instanceof GiftError ? 422 : 502);
   }

@@ -23,6 +23,8 @@ const ICONS = {
   wallet: <><path d="M3 7h18v12H3z" /><path d="M16 13h2" /><path d="M3 7l3-3h12l3 3" /></>,
   activity: <path d="M3 12h4l3-7 4 14 3-7h4" />,
   gift: <><path d="M3.5 8h17v4h-17z" /><path d="M5 12v8.5h14V12" /><path d="M12 8v12.5" /><path d="M12 8C10.6 5.2 7.2 5 7.2 6.9 7.2 8 9.5 8 12 8zm0 0c1.4-2.8 4.8-3 4.8-1.1C16.8 8 14.5 8 12 8z" /></>,
+  invite: <><circle cx="10" cy="8" r="4" /><path d="M2.5 20c1.3-4 4.2-6 7.5-6 1.5 0 2.9.4 4.1 1.1" /><path d="M18.5 13.5v6M15.5 16.5h6" /></>,
+  share: <><path d="M12 15V4" /><path d="M8 8l4-4 4 4" /><path d="M5 13v6.5h14V13" /></>,
 } as const;
 
 export type IconName = keyof typeof ICONS;

@@ -7,10 +7,12 @@ import { Approx } from "@/components/currency";
 import { useT } from "@/components/language";
 import { usePendingBuy } from "@/components/pending-buy";
 import { AssetIcon, Card, Icon } from "@/components/phone";
+import { useMofiWallet } from "@/components/signed-in";
 import { Sheet } from "@/components/sheet";
 import { units, type AssetInfo } from "@/lib/assets";
-import { TRADE_FEE_BPS, tradeFee } from "@/lib/fees";
+import { tradeFee } from "@/lib/fees";
 import { exact, priceUsd, splitCents, usd } from "@/lib/format";
+import { useFeeBps } from "@/lib/use-fee";
 import type { Portfolio } from "@/lib/use-portfolio";
 import { TradeError, useTrade } from "@/lib/use-trade";
 
@@ -20,6 +22,7 @@ const MIN = 1;
 // inside the same sheet, and Mofi buys once it lands.
 export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: AssetInfo; side: "buy" | "sell"; price?: number; portfolio: Portfolio | null; onClose: () => void }) {
   const trade = useTrade();
+  const feeBps = useFeeBps(useMofiWallet().address);
   const t = useT();
   const { pending, result, start, cancel, setShown } = usePendingBuy();
   const [amount, setAmount] = useState("");
@@ -38,7 +41,7 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
   const finished = done ?? (landed && { spent: landed.spent });
   const [whole, cents] = splitCents(dollars);
   // Mofi's fee comes out of what's bought (or out of the cash a sale brings in).
-  const fee = tradeFee(dollars);
+  const fee = tradeFee(dollars, feeBps);
   // Under $1 can still be sold when it's everything held, so a small position is never stuck.
   const min = side === "buy" ? MIN : Math.max(0.01, Math.min(MIN, Math.floor(holding * 100) / 100));
 
@@ -74,7 +77,7 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
           <div className="flex flex-col items-center gap-1 text-center">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">{side === "buy" ? t.trade.bought(asset.name) : t.trade.sold(asset.name)}</h2>
             <p className="text-sm text-ink-muted">
-              {side === "buy" ? t.trade.boughtText(price ? units(asset, (finished.spent - tradeFee(finished.spent)) / price, t.common.shares) : asset.name, usd(finished.spent)) : t.trade.soldText(usd(finished.spent - tradeFee(finished.spent)))}
+              {side === "buy" ? t.trade.boughtText(price ? units(asset, (finished.spent - tradeFee(finished.spent, feeBps)) / price, t.common.shares) : asset.name, usd(finished.spent)) : t.trade.soldText(usd(finished.spent - tradeFee(finished.spent)))}
             </p>
           </div>
           <button type="button" onClick={onClose} className="h-13 cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink">{t.common.done}</button>
@@ -135,7 +138,7 @@ export function TradeSheet({ asset, side, price, portfolio, onClose }: { asset: 
             )}
             {dollars > 0 && (
               <div className="flex items-center justify-between border-t border-divider py-3 text-sm">
-                <span className="text-ink-muted">{t.trade.fee(`${TRADE_FEE_BPS / 100}%`)}</span>
+                <span className="text-ink-muted">{t.trade.fee(`${feeBps / 100}%`)}</span>
                 <span className="font-semibold tabular-nums">{exact(fee)}</span>
               </div>
             )}

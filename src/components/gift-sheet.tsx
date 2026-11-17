@@ -11,7 +11,8 @@ import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
 import { units, type AssetInfo } from "@/lib/assets";
 import { fromBase64, toBase64 } from "@/lib/base64";
-import { TRADE_FEE_BPS, tradeFee } from "@/lib/fees";
+import { tradeFee } from "@/lib/fees";
+import { useFeeBps } from "@/lib/use-fee";
 import { exact, splitCents, usd } from "@/lib/format";
 import { newGift, saveGift, signWithGift } from "@/lib/gift-links";
 
@@ -20,6 +21,7 @@ const MIN = 1;
 // Gift an asset as a link: Mofi buys it with your cash into a gift wallet, and whoever opens the link claims it.
 export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; price?: number; cash: number; onClose: () => void }) {
   const { address, wallet } = useMofiWallet();
+  const feeBps = useFeeBps(address);
   const { signTransaction } = useSignTransaction();
   const t = useT();
   const [amount, setAmount] = useState("");
@@ -29,7 +31,7 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
   const [copied, setCopied] = useState(false);
   const dollars = Number(amount) || 0;
   const [whole, cents] = splitCents(dollars);
-  const fee = tradeFee(dollars);
+  const fee = tradeFee(dollars, feeBps);
   const cashShown = usd(Math.floor(cash * 100) / 100);
   const message = t.gift.message(usd(dollars), asset.name);
 
@@ -55,7 +57,7 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       const { signedTransaction } = await signTransaction({ transaction: fromBase64(data.transaction), wallet: wallet!, chain: "solana:mainnet" });
-      const done = await postJson("/api/trade/execute", { signedTransaction: toBase64(signedTransaction), requestId: data.requestId });
+      const done = await postJson("/api/send", { transaction: toBase64(signedTransaction) });
       const result = await done.json();
       if (!done.ok) throw new Error(result.error);
       setLink(gift.link);
@@ -110,7 +112,7 @@ export function GiftSheet({ asset, price, cash, onClose }: { asset: AssetInfo; p
           </div>
           {dollars > 0 && (
             <Card className="flex items-center justify-between px-4 py-3.5 text-sm">
-              <span className="text-ink-muted">{t.trade.fee(`${TRADE_FEE_BPS / 100}%`)}</span>
+              <span className="text-ink-muted">{t.trade.fee(`${feeBps / 100}%`)}</span>
               <span className="font-semibold tabular-nums">{exact(fee)}</span>
             </Card>
           )}

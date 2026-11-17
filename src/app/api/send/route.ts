@@ -1,5 +1,6 @@
 import { guard } from "@/lib/server/auth";
 import { rpc } from "@/lib/server/portfolio";
+import { settle } from "@/lib/server/referral";
 
 const fail = (message: string, status = 400) => Response.json({ error: message }, { status });
 
@@ -19,7 +20,11 @@ export async function POST(req: Request) {
   for (let i = 0; i < 30; i++) {
     const { value: [status] } = await rpc<Statuses>("getSignatureStatuses", [[signature]]).catch(() => ({ value: [null] }));
     if (status?.err) return failed;
-    if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") return Response.json({ signature });
+    if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+      // If this was an invited friend's trade, the inviter's share now counts on their Rewards screen.
+      await settle(signature).catch(() => {});
+      return Response.json({ signature });
+    }
     await new Promise((r) => setTimeout(r, 1000));
   }
   return fail("This is taking longer than usual. Check your balance in a minute.", 504);

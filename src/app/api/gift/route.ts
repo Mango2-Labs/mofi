@@ -1,9 +1,10 @@
 import { ASSETS, GIFTABLE, USDC_MINT } from "@/lib/assets";
 import { isSolanaAddress, toBaseUnits } from "@/lib/chains";
 import { guard } from "@/lib/server/auth";
-import { cosign, feeWallet } from "@/lib/server/fee-payer";
-import { giftReady } from "@/lib/server/gift";
-import { JupiterError, order } from "@/lib/server/jupiter";
+import { feeWallet } from "@/lib/server/fee-payer";
+import { giftAccount, giftReady } from "@/lib/server/gift";
+import { JupiterError, ShortError, build } from "@/lib/server/jupiter";
+import { inviterOf } from "@/lib/server/referral";
 
 const fail = (message: string, status = 400) => Response.json({ error: message }, { status });
 
@@ -29,10 +30,10 @@ export async function POST(req: Request) {
     if (!payer) return fail("Gifts aren't set up yet.", 503);
     if (gift === payer.address) return fail("Something went wrong. Try again.");
     if (!(await giftReady(gift, asset.mint))) return fail("This gift wasn't set up. Try again.");
-    const o = await order({ inputMint: USDC_MINT, outputMint: asset.mint, amount, taker: owner, receiver: gift, payer: payer.address });
-    if (!o.transaction) return fail(o.errorCode === 1 ? "You don't have that much cash." : "Couldn't get a price right now. Try a different amount.", 422);
-    return Response.json({ transaction: await cosign(o.transaction), requestId: o.requestId });
+    const { transaction } = await build({ inputMint: USDC_MINT, outputMint: asset.mint, amount, taker: owner, destinationTokenAccount: await giftAccount(gift, asset.mint), inviter: await inviterOf(owner) });
+    return Response.json({ transaction });
   } catch (e) {
+    if (e instanceof ShortError) return fail("You don't have that much cash.", 422);
     return fail(e instanceof JupiterError ? e.message : "Something went wrong. Try again.", 502);
   }
 }

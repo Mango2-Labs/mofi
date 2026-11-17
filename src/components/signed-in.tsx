@@ -5,6 +5,7 @@ import { useWallets } from "@privy-io/react-auth/solana";
 import type { ReactNode } from "react";
 import { useT } from "@/components/language";
 import { Wordmark } from "@/components/logo";
+import { Named } from "@/components/username";
 
 export function useMofiWallet() {
   const { user, logout } = usePrivy();
@@ -14,9 +15,10 @@ export function useMofiWallet() {
 
 export function SignedIn({ children }: { children: ReactNode }) {
   const { ready, authenticated, login } = usePrivy();
+  const { address, email } = useMofiWallet();
   const t = useT();
   if (!ready) return <div className="m-auto"><Wordmark width={72} /></div>;
-  if (authenticated) return children;
+  if (authenticated) return <Named wallet={address} email={email}>{children}</Named>;
   return (
     <div className="m-auto flex w-full flex-col items-center gap-6 text-center">
       <Wordmark width={88} />

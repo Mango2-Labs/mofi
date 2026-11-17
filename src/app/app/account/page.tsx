@@ -6,7 +6,9 @@ import { CurrencySwitch, useMoney } from "@/components/currency";
 import { LanguageSwitch, useT } from "@/components/language";
 import { AssetIcon, Card, Icon, Money } from "@/components/phone";
 import { SignedIn, useMofiWallet } from "@/components/signed-in";
+import { usernameOf } from "@/components/username";
 import { ASSETS } from "@/lib/assets";
+import { INVITED_FEE_BPS, INVITER_BPS } from "@/lib/fees";
 import { openGift, savedGifts, type SavedGift } from "@/lib/gift-links";
 import { usePoll } from "@/lib/use-poll";
 import { usePortfolio } from "@/lib/use-portfolio";
@@ -49,83 +51,109 @@ function Account() {
     ).then((list) => live && setGifts(list.filter((g) => !g.claimed)));
     return () => { live = false; };
   }, [address]);
+  const username = usernameOf(address);
+  const row = "flex items-center gap-3 py-3";
+  const badge = "flex size-9 shrink-0 items-center justify-center rounded-full";
   return (
     <>
       <h1 className="text-center text-base font-semibold">{t.account.title}</h1>
 
-      <div className="flex flex-col gap-0.5 px-1 pt-2">
-        <span className="text-xs text-ink-muted">{t.account.cash}</span>
-        {portfolio ? <Money value={portfolio.cash} className="text-[44px] leading-[1.05]" /> : <span className="text-[44px] leading-[1.05] font-semibold text-ink-faint">{m.none}</span>}
-      </div>
-
-      <div className="flex gap-2">
-        <Link href="/app/deposit" className="flex-1 rounded-full bg-ink py-3 text-center text-sm font-semibold text-on-ink">{t.account.deposit}</Link>
-        <Link href="/app/withdraw" className="flex-1 rounded-full bg-card py-3 text-center text-sm font-semibold">{t.account.withdraw}</Link>
-        <Link href="/app/borrow" className="flex-1 rounded-full bg-card py-3 text-center text-sm font-semibold">{t.account.borrow}</Link>
-      </div>
-
-      <Link href="/app/earn" className="flex items-center gap-3 rounded-[18px] bg-card px-4 py-3">
-        <span className="flex size-9 items-center justify-center rounded-full bg-gain text-white"><Icon name="rise" size={16} stroke={2.2} /></span>
-        <span className="flex flex-1 flex-col leading-tight">
-          <span className="text-[15px] font-semibold">{t.account.earn}</span>
-          <span className="text-xs text-ink-muted">{apy != null ? t.account.earnRate((apy * 100).toFixed(2)) : t.account.earnPlain}</span>
+      <div className="flex items-center gap-3 px-1 pt-1">
+        <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-full bg-ink text-lg font-semibold text-on-ink uppercase">{(username ?? email ?? "m")[0]}</span>
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span className="truncate text-[17px] font-semibold">{username ? `@${username}` : email}</span>
+          {username && <span className="truncate text-sm text-ink-muted">{email}</span>}
         </span>
-        {portfolio && portfolio.earn >= 0.01 && <span className="text-[15px] font-semibold tabular-nums">{m.money(portfolio.earn)}</span>}
-        <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
-      </Link>
+      </div>
+
+      <Card className="gap-4 px-4 py-4">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-ink-muted">{t.account.cash}</span>
+          {portfolio ? <Money value={portfolio.cash} className="text-[40px] leading-[1.05]" /> : <span className="text-[40px] leading-[1.05] font-semibold text-ink-faint">{m.none}</span>}
+        </div>
+        <div className="flex gap-2">
+          <Link href="/app/deposit" className="flex-1 rounded-full bg-ink py-3 text-center text-sm font-semibold text-on-ink">{t.account.deposit}</Link>
+          <Link href="/app/withdraw" className="flex-1 rounded-full bg-surface-app py-3 text-center text-sm font-semibold">{t.account.withdraw}</Link>
+          <Link href="/app/borrow" className="flex-1 rounded-full bg-surface-app py-3 text-center text-sm font-semibold">{t.account.borrow}</Link>
+        </div>
+      </Card>
 
       <Card className="px-4 py-0.5">
-        <Link href="/app/explore?gift=1" className="flex items-center gap-3 py-3">
-          <span className="flex size-9 items-center justify-center rounded-full bg-ink text-on-ink"><Icon name="gift" size={17} stroke={2} /></span>
+        <Link href="/app/earn" className={row}>
+          <span className={`${badge} bg-gain-soft text-gain`}><Icon name="rise" size={16} stroke={2.2} /></span>
+          <span className="flex flex-1 flex-col leading-tight">
+            <span className="text-[15px] font-semibold">{t.account.earn}</span>
+            <span className="text-xs text-ink-muted">{apy != null ? t.account.earnRate((apy * 100).toFixed(2)) : t.account.earnPlain}</span>
+          </span>
+          {portfolio && portfolio.earn >= 0.01 && <span className="text-[15px] font-semibold tabular-nums">{m.money(portfolio.earn)}</span>}
+          <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
+        </Link>
+        <Link href="/app/explore?gift=1" className={`${row} border-t border-divider`}>
+          <span className={`${badge} bg-surface-app`}><Icon name="gift" size={17} stroke={2} /></span>
           <span className="flex flex-1 flex-col leading-tight">
             <span className="text-[15px] font-semibold">{t.account.sendGift}</span>
             <span className="text-xs text-ink-muted">{t.account.sendGiftText}</span>
           </span>
           <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
         </Link>
-        {gifts.map((g) => {
-          const asset = ASSETS.find((a) => a.symbol === g.symbol);
-          return (
-            <div key={g.link} className="flex items-center gap-3 border-t border-divider py-3">
-              {asset && <AssetIcon asset={{ ticker: asset.symbol, logo: asset.logo }} size={36} />}
-              <a href={g.link} className="flex flex-1 flex-col leading-tight">
-                <span className="text-[15px] font-semibold">{t.account.giftOf(m.money(g.amount), g.name)}</span>
-                <span className="text-xs text-ink-muted">{g.checked ? t.account.notClaimed : t.account.couldntCheck} · {new Date(g.at).toLocaleDateString(t.locale, { month: "short", day: "numeric" })}</span>
-              </a>
-              <button type="button" onClick={() => navigator.clipboard?.writeText(g.link).then(() => setCopiedGift(g.link), () => {})} className="cursor-pointer rounded-full bg-surface-app px-3.5 py-1.5 text-sm font-semibold">
-                {copiedGift === g.link ? t.common.copied : t.common.copyLink}
-              </button>
-            </div>
-          );
-        })}
+        <Link href="/app/rewards" className={`${row} border-t border-divider`}>
+          <span className={`${badge} bg-surface-app`}><Icon name="invite" size={17} stroke={2} /></span>
+          <span className="flex flex-1 flex-col leading-tight">
+            <span className="text-[15px] font-semibold">{t.account.invite}</span>
+            <span className="text-xs text-ink-muted">{t.account.inviteText(Math.round((INVITER_BPS / INVITED_FEE_BPS) * 100))}</span>
+          </span>
+          <Icon name="next" size={14} stroke={2.2} className="text-ink-faint" />
+        </Link>
       </Card>
 
-      <Card className="px-4 py-1 text-sm">
-        <div className="flex items-center justify-between gap-3 border-b border-divider py-3">
-          <span className="text-ink-muted">{t.account.email}</span>
-          <span className="truncate font-semibold">{email}</span>
+      {gifts.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h2 className="px-1 text-xs text-ink-muted">{t.account.gifts}</h2>
+          <Card className="px-4 py-0.5">
+            {gifts.map((g, i) => {
+              const asset = ASSETS.find((a) => a.symbol === g.symbol);
+              return (
+                <div key={g.link} className={`${row} ${i ? "border-t border-divider" : ""}`}>
+                  {asset && <AssetIcon asset={{ ticker: asset.symbol, logo: asset.logo }} size={36} />}
+                  <a href={g.link} className="flex flex-1 flex-col leading-tight">
+                    <span className="text-[15px] font-semibold">{t.account.giftOf(m.money(g.amount), g.name)}</span>
+                    <span className="text-xs text-ink-muted">{g.checked ? t.account.notClaimed : t.account.couldntCheck} · {new Date(g.at).toLocaleDateString(t.locale, { month: "short", day: "numeric" })}</span>
+                  </a>
+                  <button type="button" onClick={() => navigator.clipboard?.writeText(g.link).then(() => setCopiedGift(g.link), () => {})} className="cursor-pointer rounded-full bg-surface-app px-3.5 py-1.5 text-sm font-semibold">
+                    {copiedGift === g.link ? t.common.copied : t.common.copyLink}
+                  </button>
+                </div>
+              );
+            })}
+          </Card>
         </div>
-        {address && (
+      )}
+
+      <div className="flex flex-col gap-2">
+        <h2 className="px-1 text-xs text-ink-muted">{t.account.settings}</h2>
+        <Card className="px-4 py-1 text-sm">
+          {address && (
+            <div className="flex items-center justify-between gap-3 border-b border-divider py-3">
+              <span className="flex min-w-0 flex-col">
+                <span className="text-ink-muted">{t.account.address}</span>
+                <span className="font-mono text-[13px] font-medium">{address.slice(0, 6)}…{address.slice(-6)}</span>
+              </span>
+              <button type="button" onClick={() => navigator.clipboard?.writeText(address).then(() => setCopied(true), () => {})} className="cursor-pointer rounded-full bg-surface-app px-4 py-2 font-semibold">
+                {copied ? t.common.copied : t.common.copy}
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3 py-3">
-            <span className="flex min-w-0 flex-col">
-              <span className="text-ink-muted">{t.account.address}</span>
-              <span className="font-mono text-[13px] font-medium">{address.slice(0, 6)}…{address.slice(-6)}</span>
-            </span>
-            <button type="button" onClick={() => navigator.clipboard?.writeText(address).then(() => setCopied(true), () => {})} className="cursor-pointer rounded-full bg-surface-app px-4 py-2 font-semibold">
-              {copied ? t.common.copied : t.common.copy}
-            </button>
+            <span className="text-ink-muted">{t.common.language}</span>
+            <LanguageSwitch />
           </div>
-        )}
-        <div className="flex items-center justify-between gap-3 border-t border-divider py-3">
-          <span className="text-ink-muted">{t.common.language}</span>
-          <LanguageSwitch />
-        </div>
-        <div className="flex items-center justify-between gap-3 border-t border-divider py-3">
-          <span className="text-ink-muted">{t.common.currency}</span>
-          <CurrencySwitch />
-        </div>
-      </Card>
-      <button type="button" onClick={logout} className="cursor-pointer rounded-full bg-card py-3.5 font-semibold">{t.account.signOut}</button>
+          <div className="flex items-center justify-between gap-3 border-t border-divider py-3">
+            <span className="text-ink-muted">{t.common.currency}</span>
+            <CurrencySwitch />
+          </div>
+        </Card>
+      </div>
+      <button type="button" onClick={logout} className="cursor-pointer rounded-full bg-card py-3.5 font-semibold text-loss">{t.account.signOut}</button>
     </>
   );
 }

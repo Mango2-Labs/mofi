@@ -18,7 +18,8 @@ Modern finance, a dollar away. Buy and sell stocks, ETFs, pre-IPO companies and 
 
 ## Fees
 
-- **Buy, sell and gift:** 0.5%, taken as a Jupiter referral fee. Mofi keeps 0.4%.
+- **Buy, sell and gift:** 0.5%, paid in USDC as part of the swap. Jupiter takes no cut.
+- **Invited by a friend:** a 20% fee discount (0.4%), for good. A quarter of it (0.1% of each trade) goes straight to your friend's cash, and Mofi keeps 0.3%. Invite links are on the Account screen and need the Upstash store below.
 - **Deposits and regular withdrawals:** no Mofi fee. The route's own cost is shown before you confirm.
 - **Private withdrawals:** a small confidential fee, of which Mofi gets 0.04%.
 
@@ -55,4 +56,4 @@ Put these in `.env.local`:
 | `CRON_SECRET` | Protects the daily jobs in `vercel.json` |
 | `ALERT_WEBHOOK_URL` | Optional Discord or Slack webhook for low fee-wallet alerts |
 
-Trading fees go to the Jupiter referral account set in `src/lib/fees.ts`. Mofi runs on mainnet with real money, so test with small amounts.
+Trading fees (set in `src/lib/fees.ts`) go to the treasury wallet in `src/lib/server/fee-payer.ts`. Mofi runs on mainnet with real money, so test with small amounts.
