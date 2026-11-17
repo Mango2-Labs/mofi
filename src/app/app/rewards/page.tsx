@@ -34,7 +34,8 @@ function RewardsScreen() {
   const m = useMoney();
   const [copied, setCopied] = useState(false);
   const username = usernameOf(address);
-  const link = address ? inviteLink(username ?? address) : null;
+  // Without a username (only where usernames aren't set up) there is no link to share.
+  const link = username ? inviteLink(username) : null;
   const copy = () => link && navigator.clipboard?.writeText(link).then(() => setCopied(true), () => {});
 
   // Share sends a short note with the link; where sharing isn't available, the link is copied.
@@ -59,9 +60,9 @@ function RewardsScreen() {
 
       <Card className="items-center gap-4 px-4 py-5">
         {link ? <QrCode value={link} label={t.rewards.qr} size={148} /> : <span className="size-[148px] rounded-xl bg-surface-app" />}
-        {address && (
+        {username && (
           <span className="max-w-full truncate text-sm font-medium">
-            <span className="text-ink-faint">{location.host}/r/</span>{username ?? `${address.slice(0, 4)}…${address.slice(-4)}`}
+            <span className="text-ink-faint">{location.host}/r/</span>{username}
           </span>
         )}
         <div className="flex w-full gap-2">

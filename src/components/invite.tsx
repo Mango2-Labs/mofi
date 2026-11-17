@@ -3,13 +3,12 @@
 import { useEffect } from "react";
 import { useMofiWallet } from "@/components/signed-in";
 import { postJson } from "@/lib/api";
-import { isSolanaAddress } from "@/lib/chains";
 import { USERNAME } from "@/lib/username";
 
 const KEY = "mofi:invite";
 
-// `code` is the inviter's username, or their Mofi address if they have none.
-export const inviteLink = (code: string) => `${location.origin}/r/${code}`;
+// `username` is the inviter's.
+export const inviteLink = (username: string) => `${location.origin}/r/${username}`;
 
 // Remembers the friend behind an invite link on this device until the visitor signs up. The link, /r/username,
 // redirects to /?ref=username (see next.config.ts).
@@ -17,7 +16,7 @@ export function InviteCapture() {
   useEffect(() => {
     const by = new URLSearchParams(location.search).get("ref");
     try {
-      if (by && (USERNAME.test(by) || isSolanaAddress(by))) localStorage.setItem(KEY, by);
+      if (by && USERNAME.test(by)) localStorage.setItem(KEY, by);
     } catch {}
   }, []);
   return null;

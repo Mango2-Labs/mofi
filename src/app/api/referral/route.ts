@@ -36,8 +36,9 @@ export async function POST(req: Request) {
   const denied = await guard(req, { counted: true, wallet });
   if (denied) return denied;
   try {
-    // An invite link carries the friend's username, or their Mofi address.
-    const inviter = isSolanaAddress(by) ? by : await walletOf(by);
+    // An invite link carries the friend's username, so the inviter is always someone with a Mofi account, never
+    // an arbitrary wallet.
+    const inviter = await walletOf(by);
     if (!inviter) return fail("That invite link isn't valid.");
     return Response.json({ joined: await join(wallet, inviter) });
   } catch {
