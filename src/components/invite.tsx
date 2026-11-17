@@ -10,14 +10,18 @@ const KEY = "mofi:invite";
 // `username` is the inviter's.
 export const inviteLink = (username: string) => `${location.origin}/r/${username}`;
 
-// Remembers the friend behind an invite link on this device until the visitor signs up. The link, /r/username,
-// redirects to /?ref=username (see next.config.ts).
+// Remembers the friend behind an invite link, /r/username, on this device until the visitor signs up. The link
+// opens the app with ?ref=username (see next.config.ts), which is taken off the address once it's been read.
 export function InviteCapture() {
   useEffect(() => {
-    const by = new URLSearchParams(location.search).get("ref");
+    const params = new URLSearchParams(location.search);
+    const by = params.get("ref");
+    if (by === null) return;
     try {
-      if (by && USERNAME.test(by)) localStorage.setItem(KEY, by);
+      if (USERNAME.test(by)) localStorage.setItem(KEY, by);
     } catch {}
+    params.delete("ref");
+    history.replaceState(null, "", `${location.pathname}${params.size ? `?${params}` : ""}${location.hash}`);
   }, []);
   return null;
 }
