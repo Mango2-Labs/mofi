@@ -158,6 +158,7 @@ export const en = {
     taken: "Taken from your cash",
     arrives: "Arrives in",
     minutes: (n: number) => `about ${n} min`,
+    seconds: "in a few seconds",
     smallest: (need: string | null) => `The smallest withdrawal is $1, with fees on top${need ? `. You need a little over ${need} in cash` : ""}.`,
     tooMuch: "That's more than your cash once fees are added. Tap Max for the most you can send.",
     sending: "Sending…",
