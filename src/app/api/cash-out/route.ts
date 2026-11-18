@@ -123,6 +123,8 @@ async function direct(owner: string, recipient: string, amount: bigint, compare:
   const fee = BigInt(Math.round(setup * 1e6));
   const send = amount - fee;
   if (send <= BigInt(0)) return fail("Withdraw at least $1.");
-  const transaction = await payUsdc(owner, recipient, send, fee);
+  // The transfer opens the account only when the user is paying for that. Otherwise the account was there when this
+  // was priced, and if it's closed before the transfer lands, the transfer fails and the fee wallet pays no rent.
+  const transaction = await payUsdc(owner, recipient, send, fee, { open: fee > BigInt(0) });
   return Response.json({ transaction, depositAddress: recipient, direct: true, amountOut: (Number(send) / 1e6).toString(), timeEstimate: DIRECT_SECONDS });
 }
