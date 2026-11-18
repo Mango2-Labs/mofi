@@ -1,6 +1,6 @@
 import { getSetComputeUnitLimitInstruction, getSetComputeUnitPriceInstruction } from "@solana-program/compute-budget";
 import { getTransferSolInstruction } from "@solana-program/system";
-import { getTransferCheckedInstruction } from "@solana-program/token";
+import { getCreateAssociatedTokenIdempotentInstruction, getTransferCheckedInstruction } from "@solana-program/token";
 import { AuthorityType, getCloseAccountInstruction, getHarvestWithheldTokensToMintInstruction, getSetAuthorityInstruction } from "@solana-program/token-2022";
 import {
   AccountRole,
@@ -26,7 +26,7 @@ import {
 } from "@solana/kit";
 import { USDC_MINT } from "@/lib/assets";
 import { INVITED_FEE_BPS, INVITER_BPS, TRADE_FEE_BPS } from "@/lib/fees";
-import { TREASURY, feeWallet, usdcAccount } from "@/lib/server/fee-payer";
+import { TREASURY, feeSigner, feeWallet, usdcAccount } from "@/lib/server/fee-payer";
 import { SOL_MINT, rpc, type TokenAccount } from "@/lib/server/portfolio";
 import { owe } from "@/lib/server/referral";
 
@@ -133,13 +133,14 @@ export async function build({
   const buying = params.inputMint === USDC_MINT;
   const upfront = rewarded && buying ? share(BigInt(params.amount), 10_000) : BigInt(0);
   const treasuryBps = inviter ? INVITED_FEE_BPS - (rewarded ? INVITER_BPS : 0) : TRADE_FEE_BPS;
+  const treasury = await usdcAccount(TREASURY);
   const b: Build = await swapApi(
     `build?${new URLSearchParams({
       ...params,
       amount: (BigInt(params.amount) - upfront).toString(),
       payer: payer.address,
       platformFeeBps: String(treasuryBps),
-      feeAccount: await usdcAccount(TREASURY),
+      feeAccount: treasury,
       slippageBps: "rtse",
       // Leaves room for the fee wallet's signature and the instructions added below.
       maxBytes: rewarded ? "1000" : "1050",
@@ -226,6 +227,12 @@ export async function build({
   let sim = await simulate(all);
   if ((!sim || sim.err) && optional.length) {
     all = instructions;
+    sim = await simulate(all);
+  }
+  // Mofi's fee lands in the treasury's USDC account. If that account has been closed (its owner can close it when
+  // it's empty), every swap would fail, so the fee wallet opens it again as part of this trade.
+  if (sim?.err && !(await exists(treasury))) {
+    all = [getCreateAssociatedTokenIdempotentInstruction({ payer: await feeSigner(), ata: address(treasury), owner: TREASURY, mint: address(USDC_MINT) }), ...instructions];
     sim = await simulate(all);
   }
   if (!sim) throw new JupiterError(NO_PRICE);
