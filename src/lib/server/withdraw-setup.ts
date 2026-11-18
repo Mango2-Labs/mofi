@@ -45,12 +45,16 @@ async function exactCost() {
 // private withdrawal has): 0 when it's open already or still free for them, else the exact cost, rounded up to a tenth
 // of a cent. With `reserve`, the address takes a place in today's allowance (a private one, a new place each time);
 // without, it's only priced.
-export async function setupCost(owner: string, depositAddress: string | null, { reserve = false } = {}) {
+//
+// With `free: false` there's no allowance: an account that isn't open always costs the user its exact price. That's
+// for an address the user may control themselves (a plain USDC withdrawal on Solana), where a free opening would be
+// rent they could take back by closing the account, over and over.
+export async function setupCost(owner: string, depositAddress: string | null, { reserve = false, free = true } = {}) {
   if (depositAddress) {
     const { value } = await rpc<{ value: unknown }>("getAccountInfo", [await usdcAccount(depositAddress), { encoding: "base64" }]);
     if (value) return 0;
   }
-  if (!kvReady()) return exactCost();
+  if (!free || !kvReady()) return exactCost();
   const { value: balance } = await rpc<{ value: number }>("getBalance", [(await feeWallet())!.address]);
   if (balance <= FEE_WALLET_FLOOR) return exactCost();
   const key = `openings:${owner}:${day()}`;
