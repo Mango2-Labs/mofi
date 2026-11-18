@@ -19,7 +19,7 @@ import { usePoll } from "@/lib/use-poll";
 import { usePortfolio } from "@/lib/use-portfolio";
 import { useSwapStatus } from "@/lib/use-swap-status";
 
-type Quote = { transaction: string; depositAddress: string; amountOut: string; timeEstimate: number; permanent?: boolean };
+type Quote = { transaction: string; depositAddress: string; amountOut: string; timeEstimate: number; permanent?: boolean; direct?: boolean };
 // total is everything taken from cash for the amount typed to arrive, fees on top. setup is the cost of opening the
 // destination's account, when the user pays it (see withdraw-setup.ts); it's part of total.
 type Price = { total: number; setup: number; amountOut: number; timeEstimate: number };
@@ -43,7 +43,7 @@ function Withdraw() {
   const { portfolio } = usePortfolio(address);
   const { signTransaction } = useSignTransaction();
   const t = useT();
-  const assets = usePoll<AuroraAsset[]>("/api/assets", 600_000).data?.filter((a) => a.assetId !== SOL_USDC_ASSET);
+  const assets = usePoll<AuroraAsset[]>("/api/assets", 600_000).data;
   const [chain, setChain] = useState("bsc");
   const [picked, setPicked] = useState<string | null>(null);
   // Borrow sends people here with ?amount= set to what they just borrowed.
@@ -57,13 +57,19 @@ function Withdraw() {
   const [round, setRound] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const status = useSwapStatus(sent && quote ? quote.depositAddress : null, quote?.permanent ? sent ?? undefined : undefined);
+  const swapStatus = useSwapStatus(sent && quote && !quote.direct ? quote.depositAddress : null, quote?.permanent ? sent ?? undefined : undefined);
+  // USDC to a Solana address is a plain transfer: it has arrived once it's sent.
+  const status = sent && quote?.direct ? "SUCCESS" : swapStatus;
   const cash = portfolio?.cash;
-  // Dollars and the chain's own coin only; the first is picked until the user taps another.
-  const onChain = (assets ?? []).filter((a) => a.chain === chain).sort(byPreference);
+  // Dollars and the chain's own coin only; the first is picked until the user taps another. On Solana that's USDC,
+  // which goes straight to the address with no fee.
+  const onChain = (assets ?? []).filter((a) => a.chain === chain).sort((x, y) => Number(y.assetId === SOL_USDC_ASSET) - Number(x.assetId === SOL_USDC_ASSET) || byPreference(x, y));
   const main = onChain.filter((a) => /^USD/.test(a.symbol) || a.native);
   const tokens = (main.length ? main : onChain).slice(0, 4);
   const to = tokens.find((a) => a.assetId === picked) ?? tokens[0];
+  // A plain USDC transfer on Solana: no swap, so no Private and no route to credit.
+  const direct = to?.assetId === SOL_USDC_ASSET;
+  const hidden = confidential && !direct;
   const dollars = Number(amount);
 
   // Prices the withdrawal both ways once the form is filled in. Nothing is created until Withdraw.
@@ -81,13 +87,13 @@ function Withdraw() {
   }, [priceKey, assetId, amount, recipient, address, round]);
   const now = priced?.key === priceKey ? priced : null;
   const checking = !!priceKey && !now;
-  const price = confidential ? now?.priv : now?.plain;
+  const price = hidden ? now?.priv : now?.plain;
   const extra = now?.plain && now.priv ? now.priv.total - now.plain.total : null;
   const privateCost = checking ? t.withdraw.checking : now?.priv === null ? t.withdraw.notAvailable : extra === null ? null : extra <= 0 ? t.withdraw.noExtra : `+${exact(extra)}`;
   const tooMuch = (price && cash != null && price.total > cash) || (cash != null && dollars > cash);
   // Max leaves room for the fees, using the latest price when there is one. Part of the fee grows with the amount
   // (the route's spread), so it keeps half a percent spare.
-  const max = cash != null ? Math.max(0, Math.floor(((cash - (price ? price.total - dollars : 0)) / 1.005) * 100) / 100) : 0;
+  const max = cash != null ? Math.max(0, Math.floor(((cash - (price ? price.total - dollars : 0)) / (direct ? 1 : 1.005)) * 100) / 100) : 0;
 
   async function run(step: () => Promise<void>) {
     setBusy(true);
@@ -105,7 +111,7 @@ function Withdraw() {
   const withdraw = () =>
     run(async () => {
       if (!price) return;
-      const res = await postJson("/api/cash-out", { assetId, amount: price.total.toFixed(3), setup: price.setup, owner: address, recipient, private: confidential });
+      const res = await postJson("/api/cash-out", { assetId, amount: price.total.toFixed(3), setup: price.setup, owner: address, recipient, private: hidden });
       const data = await res.json();
       if (res.status === 409) {
         setPriced(null);
@@ -132,7 +138,7 @@ function Withdraw() {
     [t.withdraw.fees, price ? `+${exact(price.total - dollars - price.setup)}` : "…"],
     ...(price?.setup ? [[t.withdraw.setup, `+${exact(price.setup)}`] as [string, string]] : []),
     [t.withdraw.taken, price ? exact(price.total) : "…"],
-    [t.withdraw.arrives, price ? t.withdraw.minutes(Math.max(1, Math.round(price.timeEstimate / 60))) : "…"],
+    [t.withdraw.arrives, price ? (direct ? t.withdraw.seconds : t.withdraw.minutes(Math.max(1, Math.round(price.timeEstimate / 60)))) : "…"],
   ];
 
   return (
@@ -170,7 +176,7 @@ function Withdraw() {
           <Field id="recipient" label={t.common.yourAddress(chainName(chain))} hint={t.withdraw.addressHint}>
             <input id="recipient" autoComplete="off" spellCheck={false} placeholder={t.withdraw.paste} value={recipient} onChange={(e) => setRecipient(e.target.value)} className="w-full bg-transparent font-mono text-sm outline-none placeholder:text-ink-faint" />
           </Field>
-          <button type="button" role="switch" aria-checked={confidential} onClick={() => setConfidential(!confidential)} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-card px-4 py-3 text-left">
+          {!direct && <button type="button" role="switch" aria-checked={confidential} onClick={() => setConfidential(!confidential)} className="flex cursor-pointer items-center gap-3 rounded-[18px] bg-card px-4 py-3 text-left">
             <span className="flex flex-1 flex-col leading-tight">
               <span className="text-sm font-semibold">{t.withdraw.private}</span>
               <span className="text-xs text-ink-muted">{t.withdraw.privateHint}</span>
@@ -179,7 +185,7 @@ function Withdraw() {
             <span className={`flex h-6 w-10 shrink-0 items-center rounded-full p-0.5 transition-colors ${confidential ? "bg-ink" : "bg-line"}`}>
               <span className={`size-5 rounded-full bg-white shadow-sm transition-transform motion-reduce:transition-none ${confidential ? "translate-x-4" : ""}`} />
             </span>
-          </button>
+          </button>}
 
           {priceKey && (now?.error ? (
             <p className="px-1 text-sm text-loss">{t.serverError(now.error)}</p>
@@ -204,9 +210,9 @@ function Withdraw() {
           {error && <p className="px-1 text-sm text-loss">{t.serverError(error)}</p>}
 
           <button type="submit" disabled={busy || !price || !wallet || tooMuch} className="cursor-pointer rounded-full bg-ink py-3.5 font-semibold text-on-ink disabled:cursor-default disabled:opacity-40">
-            {busy ? t.withdraw.sending : price ? t.withdraw.submit(exact(price.total), confidential) : t.withdraw.title}
+            {busy ? t.withdraw.sending : price ? t.withdraw.submit(exact(price.total), hidden) : t.withdraw.title}
           </button>
-          <PoweredBy by={t.withdraw.by(confidential)} />
+          {!direct && <PoweredBy by={t.withdraw.by(confidential)} />}
         </form>
       )}
 

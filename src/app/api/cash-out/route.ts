@@ -2,6 +2,7 @@ import { guard } from "@/lib/server/auth";
 import { AuroraError, assets, createQuote } from "@/lib/server/aurora";
 import { feeWallet, payUsdc } from "@/lib/server/fee-payer";
 import { kvReady } from "@/lib/server/kv";
+import { TOKEN_PROGRAMS, rpc } from "@/lib/server/portfolio";
 import { SetupError, knownAddress, permanentAddress, setupCost } from "@/lib/server/withdraw-setup";
 import { SOL_USDC_ASSET, chainName, isSolanaAddress, looksLikeAddress, toBaseUnits } from "@/lib/chains";
 import { usd } from "@/lib/format";
@@ -16,6 +17,9 @@ const fail = (message: string, status = 400) => Response.json({ error: message }
 // `amount` is everything taken from the user's cash: that setup cost, if any, and Aurora gets the rest.
 // With `compare`, `amount` is what should arrive instead. It prices the withdrawal with and without Private (dry
 // quotes) and returns the total to take, fees on top, before the user taps Withdraw.
+//
+// USDC to a Solana address is the one withdrawal that isn't a swap: cash already is USDC on Solana, so it's a plain
+// transfer straight to the address, with no Aurora, no spread and no Private (see `direct`).
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const compare = body?.compare === true;
@@ -31,7 +35,8 @@ export async function POST(req: Request) {
   if (!feeWallet()) return fail("Withdrawals aren't set up yet.", 503);
 
   try {
-    const to = (await assets()).find((a) => a.assetId === body?.assetId && a.assetId !== SOL_USDC_ASSET);
+    if (body?.assetId === SOL_USDC_ASSET) return await direct(owner, recipient, BigInt(amount), compare, Number(body?.setup ?? 0));
+    const to = (await assets()).find((a) => a.assetId === body?.assetId);
     if (!to) return fail("Pick where to send it.");
     if (!looksLikeAddress(recipient)) return fail(`Enter your ${chainName(to.chain)} address.`);
     const quote = (input: bigint, privately: boolean, dry: boolean) =>
@@ -92,4 +97,31 @@ export async function POST(req: Request) {
   } catch (e) {
     return fail(e instanceof AuroraError || e instanceof SetupError ? e.message : "Something went wrong. Try again.", 502);
   }
+}
+
+// How long a plain transfer on Solana takes, in seconds.
+const DIRECT_SECONDS = 5;
+
+// USDC straight to a Solana wallet. The fee wallet pays the network fee and opens the wallet's USDC account if it has
+// none, under the same rule as any other withdrawal: free within the user's daily allowance, else at its exact cost.
+async function direct(owner: string, recipient: string, amount: bigint, compare: boolean, setupSeen: number) {
+  if (!isSolanaAddress(recipient)) return fail("Enter your Solana address.");
+  if (recipient === owner) return fail("That's your own Mofi address.");
+  // USDC sent to a token account's or a program's address would open an account nobody can spend from.
+  const { value: account } = await rpc<{ value: { owner: string; executable: boolean } | null }>("getAccountInfo", [recipient, { encoding: "base64", dataSlice: { offset: 0, length: 0 } }]);
+  if (account && (account.executable || TOKEN_PROGRAMS.includes(account.owner))) return fail("That isn't a wallet address. Enter the Solana address of the wallet itself.");
+
+  if (compare) {
+    const want = Number(amount) / 1e6;
+    const setup = await setupCost(owner, recipient);
+    return Response.json({ plain: { total: Math.ceil((want + setup) * 1000) / 1000, setup, amountOut: want, timeEstimate: DIRECT_SECONDS }, private: null });
+  }
+
+  const setup = await setupCost(owner, recipient, { reserve: true });
+  if (!(setup <= setupSeen + 0.0005)) return fail("The network setup cost changed. Check the new total and try again.", 409);
+  const fee = BigInt(Math.round(setup * 1e6));
+  const send = amount - fee;
+  if (send <= BigInt(0)) return fail("Withdraw at least $1.");
+  const transaction = await payUsdc(owner, recipient, send, fee);
+  return Response.json({ transaction, depositAddress: recipient, direct: true, amountOut: (Number(send) / 1e6).toString(), timeEstimate: DIRECT_SECONDS });
 }
