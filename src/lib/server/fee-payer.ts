@@ -55,8 +55,10 @@ export async function payTreasury(owner: TransactionSigner, fee: bigint, payer: 
 
 // A USDC transfer from the user to an Aurora deposit address. The fee wallet pays the Solana fee and opens the
 // deposit address's USDC account if it isn't open yet; `fee` (the user's share of that, when there is one) goes to the treasury.
-// The server only builds these for addresses Aurora just gave it.
-export async function payUsdc(from: string, to: string, amount: bigint, fee = BigInt(0)) {
+// The server only builds these for addresses Aurora just gave it, or (a plain USDC withdrawal) a wallet the user named.
+// With `open: false` the transfer doesn't open the receiving account, so it fails if that account isn't there: for
+// when the fee wallet shouldn't be left paying rent for an account that was closed after the transfer was built.
+export async function payUsdc(from: string, to: string, amount: bigint, fee = BigInt(0), { open = true } = {}) {
   const payer = await feeSigner();
   const owner = createNoopSigner(address(from));
   const mint = address(USDC_MINT);
@@ -75,7 +77,7 @@ export async function payUsdc(from: string, to: string, amount: bigint, fee = Bi
         [
           getSetComputeUnitLimitInstruction({ units: 60_000 }),
           getSetComputeUnitPriceInstruction({ microLamports: 100_000 }),
-          getCreateAssociatedTokenIdempotentInstruction({ payer, ata: destination, owner: address(to), mint }),
+          ...(open ? [getCreateAssociatedTokenIdempotentInstruction({ payer, ata: destination, owner: address(to), mint })] : []),
           getTransferCheckedInstruction({ source, mint, destination, authority: owner, amount, decimals: 6 }),
           ...toTreasury,
         ],

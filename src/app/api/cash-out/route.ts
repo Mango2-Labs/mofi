@@ -102,8 +102,9 @@ export async function POST(req: Request) {
 // How long a plain transfer on Solana takes, in seconds.
 const DIRECT_SECONDS = 5;
 
-// USDC straight to a Solana wallet. The fee wallet pays the network fee and opens the wallet's USDC account if it has
-// none, under the same rule as any other withdrawal: free within the user's daily allowance, else at its exact cost.
+// USDC straight to a Solana wallet. The fee wallet pays the network fee. If the wallet has no USDC account yet, the
+// fee wallet opens it and the user pays its exact cost, with no free allowance: the wallet may be the user's own,
+// and rent they got for free is rent they could take back by closing the account.
 async function direct(owner: string, recipient: string, amount: bigint, compare: boolean, setupSeen: number) {
   if (!isSolanaAddress(recipient)) return fail("Enter your Solana address.");
   if (recipient === owner) return fail("That's your own Mofi address.");
@@ -113,15 +114,17 @@ async function direct(owner: string, recipient: string, amount: bigint, compare:
 
   if (compare) {
     const want = Number(amount) / 1e6;
-    const setup = await setupCost(owner, recipient);
+    const setup = await setupCost(owner, recipient, { free: false });
     return Response.json({ plain: { total: Math.ceil((want + setup) * 1000) / 1000, setup, amountOut: want, timeEstimate: DIRECT_SECONDS }, private: null });
   }
 
-  const setup = await setupCost(owner, recipient, { reserve: true });
+  const setup = await setupCost(owner, recipient, { free: false });
   if (!(setup <= setupSeen + 0.0005)) return fail("The network setup cost changed. Check the new total and try again.", 409);
   const fee = BigInt(Math.round(setup * 1e6));
   const send = amount - fee;
   if (send <= BigInt(0)) return fail("Withdraw at least $1.");
-  const transaction = await payUsdc(owner, recipient, send, fee);
+  // The transfer opens the account only when the user is paying for that. Otherwise the account was there when this
+  // was priced, and if it's closed before the transfer lands, the transfer fails and the fee wallet pays no rent.
+  const transaction = await payUsdc(owner, recipient, send, fee, { open: fee > BigInt(0) });
   return Response.json({ transaction, depositAddress: recipient, direct: true, amountOut: (Number(send) / 1e6).toString(), timeEstimate: DIRECT_SECONDS });
 }
